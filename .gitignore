@@ -7,3 +7,4 @@ NaverPaper.iml
 # Project stuff
 db.sqlite3
 .env
+visited_urls.txt
