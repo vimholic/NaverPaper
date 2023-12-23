@@ -1,0 +1,9 @@
+# Environment
+.idea/
+venv/
+NaverPaper.iml
+.DS_Store
+
+# Project stuff
+db.sqlite3
+.env
