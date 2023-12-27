@@ -3,6 +3,7 @@ from aiohttp import ClientSession
 from lxml import html
 from urllib.parse import urljoin
 from database import VisitedUrl, get_session
+from datetime import datetime, timedelta
 
 visited_urls = set()
 campaign_links = []
@@ -69,6 +70,26 @@ async def process_ppomppu_url(url, tree, session, session_db):
         session_db.add(VisitedUrl(url=full_link))
 
 
+def delete_old_urls():
+    # Get the current date
+    current_date = datetime.now()
+
+    # Calculate the date 30 days ago
+    n_days_ago = current_date - timedelta(days=60)
+
+    # Get a session from the database
+    session_db = get_session()
+
+    # Find URLs that were added more than 30 days ago
+    old_urls = session_db.query(VisitedUrl).filter(VisitedUrl.date_added < n_days_ago)
+
+    # Delete the old URLs
+    old_urls.delete()
+
+    # Commit the changes
+    session_db.commit()
+
+
 async def find_naver_campaign_links():
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
@@ -77,6 +98,9 @@ async def find_naver_campaign_links():
 
     # Get a session from the database
     session_db = get_session()
+
+    # Delete URLs that were added more than 30 days ago
+    delete_old_urls()
 
     # Read visited URLs from database
     visited_urls.update(url.url for url in session_db.query(VisitedUrl).all())
