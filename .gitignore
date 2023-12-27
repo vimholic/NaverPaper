@@ -8,3 +8,4 @@ NaverPaper.iml
 db.sqlite3
 .env
 visited_urls.txt
+.db
