@@ -9,3 +9,4 @@ db.sqlite3
 .env
 visited_urls.txt
 .db
+visited_urls.db
