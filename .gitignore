@@ -7,6 +7,6 @@ NaverPaper.iml
 # Project stuff
 db.sqlite3
 .env
-visited_urls.txt
 .db
 visited_urls.db
+__pycache__/

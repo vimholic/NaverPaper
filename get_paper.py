@@ -11,6 +11,7 @@ from requests.adapters import HTTPAdapter
 import uuid
 import lzstring
 import re
+from datetime import datetime
 
 load_dotenv()
 
@@ -95,10 +96,18 @@ async def main():
     if not campaign_links:
         await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
     else:
+        pattern = r"alert\('(.*)'\)"
         for link in campaign_links:
             response = session.get(link)
+            lines = response.text.splitlines()
+
+            for line in lines:
+                if re.search(pattern, line):
+                    print(
+                        f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
+
+            response.raise_for_status()
             time.sleep(5)
-            print("캠페인 URL : " + link)
         await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
 
 
