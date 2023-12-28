@@ -1,0 +1,13 @@
+# Environment
+.idea/
+venv/
+NaverPaper.iml
+.DS_Store
+
+# Project stuff
+db.sqlite3
+.env
+.db
+visited_urls.db
+urls.db
+__pycache__/
