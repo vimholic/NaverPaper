@@ -12,7 +12,7 @@ import uuid
 import lzstring
 import re
 from datetime import datetime
-from database import UrlVisit, CampaignUrl, get_session
+from database import UrlVisit, get_session
 
 load_dotenv()
 

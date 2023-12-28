@@ -1,8 +1,7 @@
-import asyncio
 from aiohttp import ClientSession
 from lxml import html
 from urllib.parse import urljoin
-from database import CampaignUrl, UrlVisit, get_session
+from database import CampaignUrl, UrlVisit
 from datetime import datetime, timedelta
 
 campaign_urls = set()
