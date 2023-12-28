@@ -1,5 +1,4 @@
 # 주요 기능
----
 
 ## 사용성 측면
 * 멀티 사용자 지원: 여러 명의 네이버 아이디/비밀번호를 등록해두면 각각 포인트 수집
@@ -18,27 +17,43 @@
 * 방문한 URL을 TXT 파일 대신 SQLite DB에 저장(향후 확장성)
 * 병렬, 비동기 실행으로 속도 개선
 
+<br><br>
 
 # 사용법
----
 
 > Oracle Cloud의 E2 Micro 서버에서만 테스트했습니다.
 
-* [Docker 설치](https://docs.docker.com/engine/install/)
-* 소스 코드를 Git으로 Clone 또는 다운로드
+<br>
 
-```git clone https://gitea.ai-demo.duckdns.org/jihunx/NaverPaper.git```
+* [Docker 설치](https://docs.docker.com/engine/install/)
+
+<br>
+
+* 소스 코드를 Git으로 Clone 또는 다운로드
+```
+git clone https://gitea.ai-demo.duckdns.org/jihunx/NaverPaper.git
+```
+
+<br>
 
 * 소스 코드 폴더로 이동
+```
+cd NaverPaper
+```
 
-```cd NaverPaper```
+<br>
 
 * `.env.sample` 파일을 `.env`로 이름 변경
 
-```mv .env.sample .env```
+```
+mv .env.sample .env
+```
+
+<br>
 
 * `.env` 파일을 열고 `NAVER_ID`, `NAVER_PW`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 수정
   * 여러 명을 등록하고 싶은 경우 콤마(,)로 구분하여 순서대로 등록
+  * Telegram은 한 명에게만 발송 지원합니다. 복수 개 등록하지 마세요.
 
 ```
 vi .env
@@ -50,6 +65,8 @@ NAVER_PW=비밀번호1,비밀번호2
 TELEGRAM_TOKEN=토큰
 TELEGRAM_CHAT_ID=챗ID
 ```
+
+<br>
 
 * Docker 이미지 빌드 및 실행
   * 최초 실행시 네이버 폐지 줍기를 한 번 실행합니다. 
