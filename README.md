@@ -1,5 +1,4 @@
 # 주요 기능
-
 ---
 
 ## 사용성 측면
@@ -21,9 +20,9 @@
 
 
 # 사용법
+---
 
 > Oracle Cloud의 E2 Micro 서버에서만 테스트했습니다.
----
 
 * [Docker 설치](https://docs.docker.com/engine/install/)
 * 소스 코드를 Git으로 Clone 또는 다운로드
