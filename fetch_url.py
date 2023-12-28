@@ -39,7 +39,8 @@ async def process_clien_url(url, tree, session, session_db):
         inner_tree = html.fromstring(res)
 
         # Find all links that start with the campaign URL
-        for a_tag in inner_tree.xpath('//a[starts-with(@href, "https://campaign2-api.naver.com")]/@href'):
+        for a_tag in inner_tree.xpath(
+                '//a[starts-with(@href, "https://campaign2-api.naver.com") or starts-with(@href, "https://ofw.adison.co")]/@href'):
             campaign_links.append(a_tag)
 
         # Add the visited link to the set and database
