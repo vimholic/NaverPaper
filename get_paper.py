@@ -86,30 +86,36 @@ class TelegramMessenger:
 
 
 async def main():
-    account = NaverAccount(nid=os.environ.get("NAVER_ID"), npw=os.environ.get("NAVER_PW"))
-    session = account.naver_session()
+    naver_ids = os.environ.get("NAVER_ID").split(',')
+    naver_pws = os.environ.get("NAVER_PW").split(',')
 
-    campaign_links = await fetch_url.find_naver_campaign_links()
+    for nid, npw in zip(naver_ids, naver_pws):
+        print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
+        account = NaverAccount(nid=nid, npw=npw)
+        session = account.naver_session()
 
-    messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"), chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
+        campaign_links = await fetch_url.find_naver_campaign_links()
 
-    if not campaign_links:
-        await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
-    else:
-        pattern = r"alert\('(.*)'\)"
-        for link in campaign_links:
-            response = session.get(link)
-            lines = response.text.splitlines()
+        messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
+                                      chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
 
-            for line in lines:
-                if re.search(pattern, line):
-                    print(
-                        f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
+        if not campaign_links:
+            await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
+        else:
+            pattern = r"alert\('(.*)'\)"
+            for link in campaign_links:
+                response = session.get(link)
+                lines = response.text.splitlines()
 
-            response.raise_for_status()
-            time.sleep(5)
-        await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
+                for line in lines:
+                    if re.search(pattern, line):
+                        print(
+                            f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
 
+                response.raise_for_status()
+                time.sleep(5)
+            await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
+        print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
 
 if __name__ == '__main__':
     asyncio.run(main())
