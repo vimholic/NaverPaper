@@ -12,6 +12,7 @@ import uuid
 import lzstring
 import re
 from datetime import datetime
+from database import UrlVisit, CampaignUrl, get_session
 
 load_dotenv()
 
@@ -85,37 +86,61 @@ class TelegramMessenger:
         await bot.sendMessage(chat_id=self.chat_id, text=message)
 
 
+async def get_naver_session(nid, npw):
+    account = NaverAccount(nid=nid, npw=npw)
+    return account.naver_session()
+
+
+async def process_campaign_links(session, campaign_links, session_db, nid):
+    pattern = r"alert\('(.*)'\)"
+    for link in campaign_links:
+        response = session.get(link)
+        lines = response.text.splitlines()
+
+        for line in lines:
+            if re.search(pattern, line):
+                print(
+                    f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
+
+        # Create a new UrlVisit object and add it to the session
+        existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
+        if not existing_visit:
+            session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
+
+        response.raise_for_status()
+        time.sleep(5)
+
+
+async def send_telegram_message(campaign_links):
+    messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
+                                  chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
+    if not campaign_links:
+        await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
+    else:
+        await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
+
+
 async def main():
     naver_ids = os.environ.get("NAVER_ID").split(',')
     naver_pws = os.environ.get("NAVER_PW").split(',')
+    session_db = get_session()
 
-    for nid, npw in zip(naver_ids, naver_pws):
-        print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
-        account = NaverAccount(nid=nid, npw=npw)
-        session = account.naver_session()
+    try:
+        print("캠페인 URL 수집 시작 - " + datetime.now().strftime('%H:%M:%S'))
+        await fetch_url.save_naver_campaign_urls(session_db)
+        print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%H:%M:%S'))
+        for nid, npw in zip(naver_ids, naver_pws):
+            print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
+            session = await get_naver_session(nid, npw)
+            campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
+            await process_campaign_links(session, campaign_links, session_db, nid)
+            await send_telegram_message(campaign_links)
+            print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
 
-        campaign_links = await fetch_url.find_naver_campaign_links()
+        session_db.commit()
+    finally:
+        session_db.close()
 
-        messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
-                                      chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
-
-        if not campaign_links:
-            await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
-        else:
-            pattern = r"alert\('(.*)'\)"
-            for link in campaign_links:
-                response = session.get(link)
-                lines = response.text.splitlines()
-
-                for line in lines:
-                    if re.search(pattern, line):
-                        print(
-                            f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
-
-                response.raise_for_status()
-                time.sleep(5)
-            await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
-        print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
 
 if __name__ == '__main__':
     asyncio.run(main())
