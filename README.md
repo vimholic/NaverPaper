@@ -120,8 +120,16 @@ docker compose up -d
 
 <br>
 
+## 실행 시간 관련
+* 한국 시간 기준으로 3시, 9시, 15시, 21시 이렇게 네 번 실행됩니다.
+* 변경하고 싶은 경우 app.cron을 수정한 후 이미지를 다시 빌드해주시거나, 컨테이너 쉘로 접속해서 `crontab -e` 명령어로 직접 수정하는 두 가지 방법이 있습니다.
+
+<br>
+
 ## 텔레그램 알림을 받고 싶지 않은 경우
-`get_paper.py`에서 아래 구문을 주석 처리(앞에 #을 붙여 주세요)
+`.env` 파일의 `TELEGRAM_CHAT_ID` 혹은 `TELEGRAM_TOKEN` 중 하나라도 입력돼 있지 않은 경우 알림 메시지가 발송되지 않습니다.
+
+`.env`를 수정하고 싶지 않은 경우에는 `get_paper.py`에서 아래 구문을 주석 처리(앞에 #을 붙여 주세요)
 
 ```
 # await send_telegram_message(campaign_links, nid) 
