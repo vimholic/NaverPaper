@@ -1,5 +1,5 @@
 # pull official base image
-FROM --platform=linux/amd64 python:3.9.15-slim-buster
+FROM python:3.9.15-slim-buster
 
 # set work directory
 WORKDIR /app

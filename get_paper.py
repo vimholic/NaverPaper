@@ -111,13 +111,13 @@ async def process_campaign_links(session, campaign_links, session_db, nid):
         time.sleep(5)
 
 
-async def send_telegram_message(campaign_links):
+async def send_telegram_message(campaign_links, nid):
     messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
                                   chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
     if not campaign_links:
-        await messenger.send_message("더 이상 주울 네이버 폐지가 없습니다.")
+        await messenger.send_message(f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
     else:
-        await messenger.send_message("모든 네이버 폐지 줍기를 완료했습니다.")
+        await messenger.send_message(f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다.")
 
 
 async def main():
@@ -130,11 +130,13 @@ async def main():
         await fetch_url.save_naver_campaign_urls(session_db)
         print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%H:%M:%S'))
         for nid, npw in zip(naver_ids, naver_pws):
+            nid = nid.strip()
+            npw = npw.strip()
             print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
             session = await get_naver_session(nid, npw)
             campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
             await process_campaign_links(session, campaign_links, session_db, nid)
-            await send_telegram_message(campaign_links)
+            await send_telegram_message(campaign_links, nid)
             print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
 
         session_db.commit()
