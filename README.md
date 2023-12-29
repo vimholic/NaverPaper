@@ -31,7 +31,7 @@ https://github.com/stateofai/naver-paper
 
 # 사용법
 
-> Oracle Cloud의 E2 Micro 서버에서만 테스트했습니다.
+> Oracle Cloud의 E2 Micro, A1 서버, 시놀로지에서 정상 동작 확인했습니다.
 
 <br>
 
@@ -63,7 +63,7 @@ mv .env.sample .env
 
 * `.env` 파일을 열고 `NAVER_ID`, `NAVER_PW`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 수정
   * 여러 명을 등록하고 싶은 경우 콤마(,)로 구분하여 순서대로 등록
-  * Telegram은 한 명에게만 발송 지원합니다. 복수 개 등록하지 마세요.
+  * Telegram도 아예 받고 싶지 않은 경우에는 공란으로, 받고 싶은 경우에는 NAVER_ID에 입력한 사람 수만큼 쌍으로 입력해야 함.
 
 ```
 vi .env
@@ -72,8 +72,8 @@ vi .env
 ```
 NAVER_ID=아이디1,아이디2
 NAVER_PW=비밀번호1,비밀번호2
-TELEGRAM_TOKEN=토큰
-TELEGRAM_CHAT_ID=챗ID
+TELEGRAM_TOKEN=토큰1,토큰2
+TELEGRAM_CHAT_ID=챗ID1,챗ID2
 ```
 
 <br>
