@@ -120,6 +120,81 @@ docker compose up -d
 
 <br>
 
+## 텔레그램 알림을 받고 싶지 않은 경우
+`get_paper.py`에서 아래 구문을 주석 처리(앞에 #을 붙여 주세요)
+
+```
+# await send_telegram_message(campaign_links, nid) 
+```
+
+<br>
+
+## 시놀로지 컨테이너 매니저로 설치시 ERROR [ 4/10] RUN apt-get update  && apt-get install -y cron vim 에러 발생하는 경우
+1. 아래 URL에 있는대로 SSH로 접속하여 Docker를 재시작해보세요.
+
+https://stackoverflow.com/questions/61567404/docker-temporary-failure-resolving-deb-debian-org
+
+```
+sudo service docker restart
+sudo /etc/init.d/docker restart
+sudo snap restart docker
+```
+
+<br>
+
+2. 시놀로지 지식센터에 올라온 Docker 이미지를 다운로드 받을 수 없는 현상에 대한 해결 방법을 적용해 보세요.
+
+https://kb.synology.com/ko-kr/DSM/tutorial/Why_cant_I_pull_docker_images
+
+<br>
+
+3. Docker Daemon에 구글 DNS를 등록해보세요(2번에 언급된 것과 조금 겹치기는 합니다).
+
+https://stackoverflow.com/questions/61567404/docker-temporary-failure-resolving-deb-debian-org
+
+Create a `/etc/docker/daemon.json` file with this content:
+
+```
+{
+  "dns": ["8.8.8.8", "8.8.4.4"]
+}
+```
+
+<br>
+
+4. vim이랑 cron은 각각 텍스트 편집기, 스케줄 작업을 위해 설치하는 패키지인데요, 폐지를 줍는 프로그램을 실행하는데 필요한 패키지는 아닙니다. 그래서 설치할 때 vim과 cron 관련된 부분을 모두 제거하고 설치하고, 스케줄은 시놀로지 제어판의 작업 스케줄러로 실행하는 방법입니다.
+
+*vim이랑 cron 설치 안 하는 방법*
+
+Dockerfile에서 아래 적은 부분 모두 주석 처리(앞에 #을 붙여주세요)
+
+```
+RUN apt-get update \
+  && apt-get install -y cron vim
+
+COPY app.cron /etc/cron.d/app-cron
+
+RUN chmod 0644 /etc/cron.d/app-cron
+
+RUN crontab /etc/cron.d/app-cron
+
+CMD cron -f
+```
+
+<br>
+
+*시놀로지 작업 스케줄러 등록 방법*
+
+`생성 > 예약된 작업 > 사용자 정의 스크립트` 선택
+원하는 스케줄 선택
+사용자 정의 스크립트 부분에 아래와 같이 입력
+
+```
+docker exec [NaverPaper 컨테이너 이름 입력] python get_paper.py
+```
+
+<br>
+
 ## 실행 로그 수동 확인 방법
 * Docker 이미지를 빌드할 때 실행한 로그는 남지 않고, 이미지가 빌드된 이후의 실행 로그부터 남습니다.
 * 혹시나 로그가 제대로 남는지 테스트해보고 싶으시면 수동으로 한번 실행한 후에 `docker compose logs` 해보시기 바랍니다.
