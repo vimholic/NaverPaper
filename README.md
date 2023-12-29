@@ -87,11 +87,56 @@ docker compose up -d
 
 <br><br>
 
-# 참고
-* 네이버 로그인 전용 아이디 만들기[https://help.naver.com/service/5640/contents/10219?lang=ko]
-* 네이버 애플리케이션 비밀번호 만들기[https://help.naver.com/service/5640/contents/8584?lang=ko]
+# 네이버 로그인 관련(feat. 플루이드님)
+* 2단계 인증 되어 있으신 분은 2단계 인증 회피를 위해서 애플리케이션 비번을 만드셔야 합니다.
+  * [네이버 애플리케이션 비밀번호 만들기](https://help.naver.com/service/5640/contents/8584?lang=ko)
+* 네이버 로그인전용 아이디는 선택사항입니다. 만드셨다면 네이버 로그인전용 아이디를 기입하시면 됩니다.
+  * [네이버 로그인 전용 아이디 만들기](https://help.naver.com/service/5640/contents/10219?lang=ko)
+* 네이버 보안설정에 가시면 `타지역 로그인차단 (국내 오라클인 경우)`, `해외 로그인차단 (해외 오라클인 경우)` 꺼주셔야 정상 작동합니다.
 
 <br><br>
 
-# 알려진 이슈
-* Docker에서 python 이미지를 끌어올 때 오류 메시지 같은 것이 표시되는 분들은 `Dockerfile`에서 `FROM --platform=linux/amd64 python:3.9.15-slim-buster` 부분을 `FROM python:3.9.15-slim-buster`로 변경해보시기 바랍니다.
+# FAQ
+## NaverPaper 버전 업데이트 방법
+현재 실행 중인 컨테이너 종료
+```
+docker compose down
+```
+
+기존 이미지 제거
+```
+docker rmi [NaverPaper 이미지 이름 입력]
+```
+
+소스 코드 다시 다운로드
+```
+git pull
+```
+
+다시 이미지 빌드 및 실행
+```
+docker compose up -d
+```
+
+<br>
+
+## 실행 로그 수동 확인 방법
+* Docker 이미지를 빌드할 때 실행한 로그는 남지 않고, 이미지가 빌드된 이후의 실행 로그부터 남습니다.
+* 혹시나 로그가 제대로 남는지 테스트해보고 싶으시면 수동으로 한번 실행한 후에 `docker compose logs` 해보시기 바랍니다.
+
+*수동 실행 방법*
+```
+docker exec -it [NaverPaper 컨테이너 이름 입력] bash
+```
+
+```
+python get-paper.py
+```
+
+```
+exit
+```
+ 
+```
+docker compose logs
+```
