@@ -195,11 +195,8 @@ docker exec [NaverPaper 컨테이너 이름 입력] python get_paper.py
 
 <br>
 
-## 실행 로그 수동 확인 방법
-* Docker 이미지를 빌드할 때 실행한 로그는 남지 않고, 이미지가 빌드된 이후의 실행 로그부터 남습니다.
-* 혹시나 로그가 제대로 남는지 테스트해보고 싶으시면 수동으로 한번 실행한 후에 `docker compose logs` 해보시기 바랍니다.
+## 네이버 폐지 줍기를 수동으로 실행하는 방법
 
-*수동 실행 방법*
 ```
 docker exec -it [NaverPaper 컨테이너 이름 입력] bash
 ```
@@ -211,7 +208,9 @@ python get-paper.py
 ```
 exit
 ```
- 
+
+혹은 한 문장으로 실행하고 싶다면
+
 ```
-docker compose logs
+docker exec [NaverPaper 컨테이너 이름 입력] python get_paper.py
 ```
