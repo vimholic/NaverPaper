@@ -89,7 +89,10 @@ async def save_naver_campaign_urls(session_db):
 async def fetch_naver_campaign_urls(session_db, nid):
     campaign_links = set()
     for link in campaign_urls:
-        existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
-        if not existing_visit:
-            campaign_links.add(link)
+        # Check if the URL exists in the campaign_urls table and is available
+        available_url = session_db.query(CampaignUrl).filter_by(url=link, is_available=True).first()
+        if available_url:
+            existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
+            if not existing_visit:
+                campaign_links.add(link)
     return campaign_links

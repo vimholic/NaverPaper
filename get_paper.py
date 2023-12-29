@@ -12,7 +12,7 @@ import uuid
 import lzstring
 import re
 from datetime import datetime
-from database import UrlVisit, get_session
+from database import UrlVisit, CampaignUrl, get_session
 
 load_dotenv()
 
@@ -98,9 +98,15 @@ async def process_campaign_links(session, campaign_links, session_db, nid):
         lines = response.text.splitlines()
 
         for line in lines:
-            if re.search(pattern, line):
-                print(
-                    f"캠페인 URL: {link} - {re.search(pattern, line).group(1)} - {datetime.now().strftime('%H:%M:%S')}")
+            match = re.search(pattern, line)
+            if match:
+                result_text = match.group(1)
+                print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%H:%M:%S')}")
+
+                if '적립 기간이 아닙니다' in result_text:
+                    campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
+                    if campaign_url:
+                        campaign_url.is_available = False
 
         # Create a new UrlVisit object and add it to the session
         existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
@@ -112,12 +118,18 @@ async def process_campaign_links(session, campaign_links, session_db, nid):
 
 
 async def send_telegram_message(campaign_links, nid):
-    messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
-                                  chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
-    if not campaign_links:
-        await messenger.send_message(f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+    telegram_token = os.environ.get("TELEGRAM_TOKEN")
+    telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if telegram_token and telegram_chat_id:
+        messenger = TelegramMessenger(token=os.environ.get("TELEGRAM_TOKEN"),
+                                      chat_id=os.environ.get("TELEGRAM_CHAT_ID"))
+        if not campaign_links:
+            await messenger.send_message(f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+        else:
+            await messenger.send_message(
+                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?category=all")
     else:
-        await messenger.send_message(f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다.")
+        pass
 
 
 async def main():

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, DateTime, ForeignKey, PrimaryKeyConstraint
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey, PrimaryKeyConstraint
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -11,6 +11,7 @@ class CampaignUrl(Base):
 
     url = Column(String, primary_key=True)
     date_added = Column(DateTime, default=datetime.utcnow)
+    is_available = Column(Boolean, default=True)
 
 
 class UrlVisit(Base):
