@@ -41,7 +41,7 @@ https://github.com/stateofai/naver-paper
 
 * 소스 코드를 Git으로 Clone 또는 다운로드
 ```
-git clone https://gitea.ai-demo.duckdns.org/jihunx/NaverPaper.git
+git clone https://gitea.ai-demo.duckdns.org/sjva-repo/NaverPaper.git
 ```
 
 <br>
@@ -62,7 +62,7 @@ mv .env.sample .env
 <br>
 
 * `.env` 파일을 열고 `NAVER_ID`, `NAVER_PW`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 수정
-  * 여러 명을 등록하고 싶은 경우 콤마(,)로 구분하여 순서대로 등록
+  * 여러 명을 등록하고 싶은 경우 파이프(|)로 구분하여 순서대로 등록
   * Telegram도 아예 받고 싶지 않은 경우에는 공란으로, 받고 싶은 경우에는 NAVER_ID에 입력한 사람 수만큼 쌍으로 입력해야 함.
 
 ```
@@ -70,10 +70,10 @@ vi .env
 ```
 
 ```
-NAVER_ID=아이디1,아이디2
-NAVER_PW=비밀번호1,비밀번호2
-TELEGRAM_TOKEN=토큰1,토큰2
-TELEGRAM_CHAT_ID=챗ID1,챗ID2
+NAVER_ID=아이디1|아이디2
+NAVER_PW=비밀번호1|비밀번호2
+TELEGRAM_TOKEN=토큰1|토큰2
+TELEGRAM_CHAT_ID=챗ID1|챗ID2
 ```
 
 <br>
@@ -128,12 +128,6 @@ docker compose up -d
 
 ## 텔레그램 알림을 받고 싶지 않은 경우
 `.env` 파일의 `TELEGRAM_CHAT_ID` 혹은 `TELEGRAM_TOKEN` 중 하나라도 입력돼 있지 않은 경우 알림 메시지가 발송되지 않습니다.
-
-`.env`를 수정하고 싶지 않은 경우에는 `get_paper.py`에서 아래 구문을 주석 처리(앞에 #을 붙여 주세요)
-
-```
-# await send_telegram_message(campaign_links, nid) 
-```
 
 <br>
 

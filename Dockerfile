@@ -17,6 +17,7 @@ RUN apt-get update \
 # install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+#RUN playwright install-deps
 
 # Add crontab file in the cron directory
 COPY app.cron /etc/cron.d/app-cron

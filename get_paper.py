@@ -4,76 +4,37 @@ import asyncio
 from dotenv import load_dotenv
 from telegram import Bot
 import fetch_url
-import rsa
 import requests
-from urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
-import uuid
-import lzstring
 import re
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
+from playwright.async_api import Playwright, async_playwright
 
 load_dotenv()
 
 
-class NaverAccount:
-    def __init__(self, nid, npw):
-        self.nid = nid
-        self.npw = npw
-
-    def encrypt(self, key_str):
-        def naver_style_join(l):
-            return ''.join([chr(len(s)) + s for s in l])
-
-        sessionkey, keyname, e_str, n_str = key_str.split(',')
-        e, n = int(e_str, 16), int(n_str, 16)
-
-        message = naver_style_join([sessionkey, self.nid, self.npw]).encode()
-
-        pubkey = rsa.PublicKey(e, n)
-        encrypted = rsa.encrypt(message, pubkey)
-
-        return keyname, encrypted.hex()
-
-    def encrypt_account(self):
-        key_str = requests.get('https://nid.naver.com/login/ext/keys.nhn').content.decode("utf-8")
-        return self.encrypt(key_str)
-
-    def naver_session(self):
-        encnm, encpw = self.encrypt_account()
-
-        s = requests.Session()
-        retries = Retry(
-            total=5,
-            backoff_factor=0.1,
-            status_forcelist=[500, 502, 503, 504]
-        )
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        request_headers = {
-            'User-agent': 'Mozilla/5.0'
-        }
-
-        bvsd_uuid = uuid.uuid4()
-        encData = '{"a":"%s-4","b":"1.3.4","d":[{"i":"id","b":{"a":["0,%s"]},"d":"%s","e":false,"f":false},{"i":"%s","e":true,"f":false}],"h":"1f","i":{"a":"Mozilla/5.0"}}' % (
-            bvsd_uuid, self.nid, self.nid, self.npw)
-        bvsd = '{"uuid":"%s","encData":"%s"}' % (bvsd_uuid, lzstring.LZString.compressToEncodedURIComponent(encData))
-
-        resp = s.post('https://nid.naver.com/nidlogin.login', data={
-            'svctype': '0',
-            'enctp': '1',
-            'encnm': encnm,
-            'enc_url': 'http0X0.0000000000001P-10220.0000000.000000www.naver.com',
-            'url': 'www.naver.com',
-            'smart_level': '1',
-            'encpw': encpw,
-            'bvsd': bvsd
-        }, headers=request_headers)
-
-        finalize_url = re.search(r'location\.replace\("([^"]+)"\)', resp.content.decode("utf-8")).group(1)
-        s.get(finalize_url)
-
-        return s
+async def get_naver_session(playwright: Playwright, nid, npw):
+    browser = await playwright.chromium.launch(headless=True)
+    context = await browser.new_context()
+    page = await context.new_page()
+    await page.goto("https://nid.naver.com/nidlogin.login")
+    await page.locator("#id").fill(nid)
+    await page.locator("#pw").fill(npw)
+    await page.get_by_role("button", name="로그인").click()
+    await asyncio.sleep(3)
+    cookies = await context.cookies()
+    cookies_dict = {}
+    for cookie in cookies:
+        cookies_dict[cookie['name']] = cookie['value']
+    await context.close()
+    await browser.close()
+    session = requests.Session()
+    headers = {
+        'User-agent': 'Mozilla/5.0'
+    }
+    session.headers.update(headers)
+    session.cookies.update(cookies_dict)
+    return session
 
 
 class TelegramMessenger:
@@ -86,12 +47,7 @@ class TelegramMessenger:
         await bot.sendMessage(chat_id=self.chat_id, text=message)
 
 
-async def get_naver_session(nid, npw):
-    account = NaverAccount(nid=nid, npw=npw)
-    return account.naver_session()
-
-
-async def process_campaign_links(session, campaign_links, session_db, nid):
+def process_campaign_links(session, campaign_links, session_db, nid):
     pattern = r"alert\('(.*)'\)"
     for link in campaign_links:
         response = session.get(link)
@@ -134,9 +90,10 @@ async def process_account(nid, npw, session_db):
     nid = nid.strip()
     npw = npw.strip()
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
-    session = await get_naver_session(nid, npw)
+    async with async_playwright() as playwright:
+        session = await get_naver_session(playwright, nid, npw)
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
-    await process_campaign_links(session, campaign_links, session_db, nid)
+    process_campaign_links(session, campaign_links, session_db, nid)
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
     return campaign_links
 
@@ -155,8 +112,8 @@ async def process_without_telegram(naver_ids, naver_pws, session_db):
 
 
 async def main():
-    naver_ids = os.environ.get("NAVER_ID").split(',')
-    naver_pws = os.environ.get("NAVER_PW").split(',')
+    naver_ids = os.environ.get("NAVER_ID").split('|')
+    naver_pws = os.environ.get("NAVER_PW").split('|')
     telegram_token_txt = os.environ.get("TELEGRAM_TOKEN")
     telegram_chat_id_txt = os.environ.get("TELEGRAM_CHAT_ID")
     session_db = get_session()
@@ -166,8 +123,8 @@ async def main():
         await fetch_url.save_naver_campaign_urls(session_db)
         print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%H:%M:%S'))
         if telegram_token_txt and telegram_chat_id_txt:
-            telegram_tokens = telegram_token_txt.split(',')
-            telegram_chat_ids = telegram_chat_id_txt.split(',')
+            telegram_tokens = telegram_token_txt.split('|')
+            telegram_chat_ids = telegram_chat_id_txt.split('|')
             await process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db)
         elif not telegram_token_txt and not telegram_chat_id_txt:
             await process_without_telegram(naver_ids, naver_pws, session_db)
