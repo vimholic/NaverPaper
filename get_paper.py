@@ -94,7 +94,6 @@ async def process_account(nid, npw, session_db):
         session = await get_naver_session(playwright, nid, npw)
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     process_campaign_links(session, campaign_links, session_db, nid)
-    # await check_point(session)
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
     return campaign_links
 

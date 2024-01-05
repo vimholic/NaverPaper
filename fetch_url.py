@@ -9,7 +9,7 @@ campaign_urls = set()
 
 async def fetch(url, session):
     async with session.get(url) as response:
-        return await response.text()
+        return await response.text(errors="ignore")
 
 
 async def process_url(url, session, process_func):
