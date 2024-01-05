@@ -1,5 +1,5 @@
 # pull official base image
-FROM python:3.9.15-slim-buster
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 # set work directory
 WORKDIR /app
@@ -17,7 +17,6 @@ RUN apt-get update \
 # install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-#RUN playwright install-deps
 
 # Add crontab file in the cron directory
 COPY app.cron /etc/cron.d/app-cron

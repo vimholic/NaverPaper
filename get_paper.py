@@ -81,7 +81,7 @@ async def send_telegram_message(campaign_links, nid, tt, tci):
             await messenger.send_message(f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
         elif campaign_links:
             await messenger.send_message(
-                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?category=all")
+                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event")
     else:
         pass
 
@@ -94,6 +94,7 @@ async def process_account(nid, npw, session_db):
         session = await get_naver_session(playwright, nid, npw)
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     process_campaign_links(session, campaign_links, session_db, nid)
+    # await check_point(session)
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
     return campaign_links
 
