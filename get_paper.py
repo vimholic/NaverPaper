@@ -21,8 +21,8 @@ async def get_naver_session(playwright: Playwright, nid, npw):
         await page.goto("https://nid.naver.com/nidlogin.login")
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
-        await page.get_by_role("button", name="로그인").click()
-        await asyncio.sleep(3)
+        await page.locator('button[type="submit"].btn_login').click()
+        await page.wait_for_function("document.title === 'NAVER'")
         cookies = await context.cookies()
         cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
         await context.close()
