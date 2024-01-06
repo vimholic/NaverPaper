@@ -14,24 +14,25 @@ load_dotenv()
 
 
 async def get_naver_session(playwright: Playwright, nid, npw):
-    browser = await playwright.chromium.launch(headless=True)
-    context = await browser.new_context()
-    page = await context.new_page()
-    await page.goto("https://nid.naver.com/nidlogin.login")
-    await page.locator("#id").fill(nid)
-    await page.locator("#pw").fill(npw)
-    await page.get_by_role("button", name="로그인").click()
-    await asyncio.sleep(3)
-    cookies = await context.cookies()
-    cookies_dict = {}
-    for cookie in cookies:
-        cookies_dict[cookie['name']] = cookie['value']
-    await context.close()
-    await browser.close()
+    try:
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        await page.goto("https://nid.naver.com/nidlogin.login")
+        await page.locator("#id").fill(nid)
+        await page.locator("#pw").fill(npw)
+        await page.get_by_role("button", name="로그인").click()
+        await asyncio.sleep(3)
+        cookies = await context.cookies()
+        cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+        await context.close()
+        await browser.close()
+    except Exception as e:
+        print(f"Error during login: {e}")
+        return None
+
     session = requests.Session()
-    headers = {
-        'User-agent': 'Mozilla/5.0'
-    }
+    headers = {'User-agent': 'Mozilla/5.0'}
     session.headers.update(headers)
     session.cookies.update(cookies_dict)
     return session
@@ -86,21 +87,27 @@ async def send_telegram_message(campaign_links, nid, tt, tci):
         pass
 
 
-async def process_account(nid, npw, session_db):
+async def process_account(nid, npw, session_db, tt=None, tci=None):
     nid = nid.strip()
     npw = npw.strip()
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
-    async with async_playwright() as playwright:
-        session = await get_naver_session(playwright, nid, npw)
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
-    process_campaign_links(session, campaign_links, session_db, nid)
+    if campaign_links:
+        async with async_playwright() as playwright:
+            session = await get_naver_session(playwright, nid, npw)
+            if session is None:
+                if tt and tci:
+                    messenger = TelegramMessenger(token=tt, chat_id=tci)
+                    await messenger.send_message(f"{nid} - 로그인에 실패했습니다.")
+                return
+            process_campaign_links(session, campaign_links, session_db, nid)
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
     return campaign_links
 
 
 async def process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db):
     for nid, npw, tt, tci in zip(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids):
-        campaign_links = await process_account(nid, npw, session_db)
+        campaign_links = await process_account(nid, npw, session_db, tt, tci)
         tt = tt.strip()
         tci = tci.strip()
         await send_telegram_message(campaign_links, nid, tt, tci)
@@ -126,7 +133,7 @@ async def main():
             telegram_tokens = telegram_token_txt.split('|')
             telegram_chat_ids = telegram_chat_id_txt.split('|')
             await process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db)
-        elif not telegram_token_txt and not telegram_chat_id_txt:
+        elif not telegram_token_txt or not telegram_chat_id_txt:
             await process_without_telegram(naver_ids, naver_pws, session_db)
 
         session_db.commit()

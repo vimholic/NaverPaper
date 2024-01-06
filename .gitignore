@@ -11,3 +11,5 @@ db.sqlite3
 visited_urls.db
 urls.db
 __pycache__/
+naverpaper.drawio
+.$naverpaper.drawio.bkp
