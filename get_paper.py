@@ -22,7 +22,7 @@ async def get_naver_session(playwright: Playwright, nid, npw):
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
         await page.locator('button[type="submit"].btn_login').click()
-        await page.wait_for_function("document.title === 'NAVER'")
+        await asyncio.sleep(3)
         cookies = await context.cookies()
         cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
         await context.close()
