@@ -1,5 +1,7 @@
-# pull official base image
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+FROM ubuntu:22.04
+
+RUN apt-get update
+RUN apt-get install -y python3 python3-pip cron vim
 
 # set work directory
 WORKDIR /app
@@ -10,13 +12,11 @@ ENV PYTHONUNBUFFERED 1
 
 COPY . /app/
 
-# Install cron
-RUN apt-get update \
-  && apt-get install -y cron vim
-
 # install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN playwright install
+RUN playwright install-deps chromium
 
 # Add crontab file in the cron directory
 COPY app.cron /etc/cron.d/app-cron
@@ -28,5 +28,5 @@ RUN chmod 0644 /etc/cron.d/app-cron
 RUN crontab /etc/cron.d/app-cron
 
 # Run the command on container startup
-RUN python /app/get_paper.py
+RUN python3 /app/get_paper.py
 CMD cron -f
