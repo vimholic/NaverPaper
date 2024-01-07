@@ -1,58 +1,44 @@
 import os
-import time
 import asyncio
 from dotenv import load_dotenv
 from telegram import Bot
 import fetch_url
-import requests
 import re
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
-from playwright.async_api import Playwright, async_playwright
+from playwright.async_api import async_playwright, expect
 
 load_dotenv()
 
 
-async def get_naver_session(playwright: Playwright, nid, npw):
+async def send_telegram_message(token, chat_id, message):
+    bot = Bot(token=token)
+    await bot.sendMessage(chat_id=chat_id, text=message)
+
+
+async def login_to_naver(page, nid, npw, tt, tci):
     try:
-        browser = await playwright.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
         await page.goto("https://nid.naver.com/nidlogin.login")
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
         await page.locator('button[type="submit"].btn_login').click()
-        await asyncio.sleep(3)
-        cookies = await context.cookies()
-        cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-        await context.close()
-        await browser.close()
+        await expect(page.locator('//button[contains(@class, "btn_logout")]')).to_be_enabled()
+        return page
     except Exception as e:
         print(f"Error during login: {e}")
+        if page:
+            await page.screenshot(path=f"login_error_{nid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        if tt and tci:
+            await send_telegram_message(tt, tci, f"{nid} - 로그인에 실패했습니다.")
         return None
 
-    session = requests.Session()
-    headers = {'User-agent': 'Mozilla/5.0'}
-    session.headers.update(headers)
-    session.cookies.update(cookies_dict)
-    return session
 
-
-class TelegramMessenger:
-    def __init__(self, token, chat_id):
-        self.token = token
-        self.chat_id = chat_id
-
-    async def send_message(self, message):
-        bot = Bot(token=self.token)
-        await bot.sendMessage(chat_id=self.chat_id, text=message)
-
-
-def process_campaign_links(session, campaign_links, session_db, nid):
+async def process_campaign_links(page, campaign_links, session_db, nid):
     pattern = r"alert\('(.*)'\)"
     for link in campaign_links:
-        response = session.get(link)
-        lines = response.text.splitlines()
+        await page.goto(link)
+        content = await page.content()
+        lines = content.splitlines()
 
         for line in lines:
             match = re.search(pattern, line)
@@ -69,22 +55,7 @@ def process_campaign_links(session, campaign_links, session_db, nid):
         existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
         if not existing_visit:
             session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
-
-        response.raise_for_status()
-        time.sleep(5)
-
-
-async def send_telegram_message(campaign_links, nid, tt, tci):
-    no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
-    if tt and tci:
-        messenger = TelegramMessenger(token=tt, chat_id=tci)
-        if not campaign_links and no_paper_alarm == "True":
-            await messenger.send_message(f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
-        elif campaign_links:
-            await messenger.send_message(
-                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event")
-    else:
-        pass
+        await asyncio.sleep(5)
 
 
 async def process_account(nid, npw, session_db, tt=None, tci=None):
@@ -94,15 +65,32 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
         async with async_playwright() as playwright:
-            session = await get_naver_session(playwright, nid, npw)
-            if session is None:
-                if tt and tci:
-                    messenger = TelegramMessenger(token=tt, chat_id=tci)
-                    await messenger.send_message(f"{nid} - 로그인에 실패했습니다.")
-                return
-            process_campaign_links(session, campaign_links, session_db, nid)
+            browser = await playwright.chromium.launch(headless=True)
+            try:
+                page = await browser.new_page()
+                page = await login_to_naver(page, nid, npw, tt, tci)
+                if not page:
+                    return
+                await process_campaign_links(page, campaign_links, session_db, nid)
+            finally:
+                await browser.close()
     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
     return campaign_links
+
+
+async def send_result_message(campaign_links, nid, tt, tci):
+    no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
+    if tt and tci:
+        if not campaign_links and no_paper_alarm == "True":
+            await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+        elif campaign_links:
+            await send_telegram_message(
+                tt,
+                tci,
+                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
+            )
+    else:
+        pass
 
 
 async def process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db):
@@ -110,12 +98,12 @@ async def process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_
         campaign_links = await process_account(nid, npw, session_db, tt, tci)
         tt = tt.strip()
         tci = tci.strip()
-        await send_telegram_message(campaign_links, nid, tt, tci)
+        await send_result_message(campaign_links, nid, tt, tci)
 
 
 async def process_without_telegram(naver_ids, naver_pws, session_db):
     for nid, npw in zip(naver_ids, naver_pws):
-        await process_account(nid, npw, session_db)
+        await process_account(nid=nid, npw=npw, session_db=session_db)
 
 
 async def main():
@@ -135,7 +123,6 @@ async def main():
             await process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db)
         elif not telegram_token_txt or not telegram_chat_id_txt:
             await process_without_telegram(naver_ids, naver_pws, session_db)
-
         session_db.commit()
     finally:
         session_db.close()
