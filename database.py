@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Foreign
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
+import os
 
 Base = declarative_base()
 
@@ -29,7 +30,6 @@ class UrlVisit(Base):
 
 
 def get_session(db_file='urls.db'):
-    # Connect to the SQLite database
     engine = create_engine(f'sqlite:///{db_file}')
     Session = sessionmaker(bind=engine)
     session = Session()

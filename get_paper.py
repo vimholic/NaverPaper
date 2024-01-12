@@ -5,11 +5,29 @@ from telegram import Bot
 import fetch_url
 import requests
 import re
+import random
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
-from playwright.async_api import Playwright, async_playwright, expect
+from playwright.async_api import async_playwright
 
 load_dotenv()
+
+
+def get_ua():
+    uastrings = [
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.72 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10) AppleWebKit/600.1.25 (KHTML, like Gecko) Version/8.0 Safari/600.1.25",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0",
+        "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.1.17 (KHTML, like Gecko) Version/7.1 Safari/537.85.10",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit 537.36 (KHTML, like Gecko) Chrome",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+        "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36"
+    ]
+    return random.choice(uastrings)
 
 
 async def get_naver_session(nid, npw, tt, tci):
@@ -26,7 +44,7 @@ async def get_naver_session(nid, npw, tt, tci):
             cookies = await context.cookies()
             cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
             session = requests.Session()
-            headers = {'User-agent': 'Mozilla/5.0'}
+            headers = {"User-Agent": get_ua()}
             session.headers.update(headers)
             session.cookies.update(cookies_dict)
             return session
@@ -49,28 +67,32 @@ async def send_telegram_message(token, chat_id, message):
 async def process_campaign_links(session, campaign_links, session_db, nid):
     pattern = r"alert\('(.*)'\)"
     for link in campaign_links:
-        response = session.get(link)
-        lines = response.text.splitlines()
-        for line in lines:
-            match = re.search(pattern, line)
-            if match:
-                result_text = match.group(1)
-                print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%H:%M:%S')}")
-                if '적립 기간이 아닙니다' in result_text:
-                    campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
-                    if campaign_url:
-                        campaign_url.is_available = False
-        existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
-        if not existing_visit:
-            session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
-        response.raise_for_status()
-        await asyncio.sleep(5)
+        try:
+            response = session.get(link)
+            lines = response.text.splitlines()
+            for line in lines:
+                match = re.search(pattern, line)
+                if match:
+                    result_text = match.group(1)
+                    print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    if '적립 기간이 아닙니다' in result_text:
+                        campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
+                        if campaign_url:
+                            campaign_url.is_available = False
+            existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
+            if not existing_visit:
+                session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
+            response.raise_for_status()
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"캠페인 URL 처리 에러: {link} - {e}")
+            await asyncio.sleep(5)
 
 
 async def process_account(nid, npw, session_db, tt=None, tci=None):
     nid = nid.strip()
     npw = npw.strip()
-    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%H:%M:%S')}")
+    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
         session = await get_naver_session(nid, npw, tt, tci)
@@ -86,7 +108,7 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
                         tci,
                         f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
                     )
-    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%H:%M:%S')}")
+    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return campaign_links
 
 
@@ -109,9 +131,9 @@ async def main():
     telegram_chat_id_txt = os.environ.get("TELEGRAM_CHAT_ID")
     session_db = get_session()
     try:
-        print("캠페인 URL 수집 시작 - " + datetime.now().strftime('%H:%M:%S'))
+        print("캠페인 URL 수집 시작 - " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         await fetch_url.save_naver_campaign_urls(session_db)
-        print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%H:%M:%S'))
+        print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         if telegram_token_txt and telegram_chat_id_txt:
             telegram_tokens = telegram_token_txt.split('|')
             telegram_chat_ids = telegram_chat_id_txt.split('|')

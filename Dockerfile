@@ -15,7 +15,6 @@ COPY . /app/
 # install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-#RUN playwright install
 RUN playwright install --with-deps chromium
 
 # Add crontab file in the cron directory
@@ -28,5 +27,4 @@ RUN chmod 0644 /etc/cron.d/app-cron
 RUN crontab /etc/cron.d/app-cron
 
 # Run the command on container startup
-RUN python3 /app/get_paper.py
-CMD cron -f
+CMD python3 /app/get_paper.py && cron -f
