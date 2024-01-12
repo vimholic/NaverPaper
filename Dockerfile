@@ -1,7 +1,9 @@
 FROM ubuntu:22.04
 
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
 RUN apt-get update
-RUN apt-get install -y python3 python3-pip cron vim
+RUN apt-get install -y python3 python3-pip cron vim tzdata
 
 # set work directory
 WORKDIR /app
