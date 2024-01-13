@@ -1,8 +1,10 @@
 from aiohttp import ClientSession
 from lxml import html
+from lxml.etree import tostring
 from urllib.parse import urljoin
-from database import CampaignUrl, UrlVisit
 from datetime import datetime, timedelta
+import asyncio
+from database import UrlVisit, CampaignUrl, get_session
 
 campaign_urls = set()
 
@@ -49,11 +51,15 @@ async def process_ppomppu_url(url, tree, session):
         res = await fetch(full_link, session)
         try:
             inner_tree = html.fromstring(res)
+            # print(tostring(inner_tree, method="html", pretty_print=True).decode("utf-8"))
         except Exception as e:
             print(f"{full_link} - {e}")
             continue
         for a_tag in inner_tree.xpath(
-                '//a[starts-with(@href, "https://campaign2-api.naver.com")]/@href'):
+                '//a[starts-with(@href, "https://campaign2-api.naver.com")]/@href'
+                '|//a[starts-with(@href, "https://s.ppomppu.co.kr?idno=coupon") and (starts-with(text(), "https://campaign2-api.naver.com") or starts-with(text(), "https://ofw.adison.co"))]/text()'
+        ):
+            a_tag = a_tag.replace(" ", "").strip()
             campaign_urls.add(a_tag)
 
 
@@ -70,7 +76,7 @@ def delete_old_urls(session_db):
 async def save_naver_campaign_urls(session_db):
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
-        ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
+        # ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
     ]
     delete_old_urls(session_db)
     async with ClientSession() as session:
@@ -91,3 +97,12 @@ async def fetch_naver_campaign_urls(session_db, nid):
             if not existing_visit:
                 campaign_links.add(link)
     return campaign_links
+
+
+if __name__ == '__main__':
+    session_db = get_session()
+    try:
+        asyncio.run(save_naver_campaign_urls(session_db))
+        session_db.commit()
+    finally:
+        session_db.close()

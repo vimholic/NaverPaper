@@ -41,6 +41,7 @@ async def get_naver_session(nid, npw, tt, tci):
             await page.locator("#pw").fill(npw)
             await page.locator('button[type="submit"].btn_login').click()
             await page.wait_for_selector('//button[contains(@class, "btn_logout")]')
+            storage = await context.storage_state(path="state.json")
             cookies = await context.cookies()
             cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
             session = requests.Session()
