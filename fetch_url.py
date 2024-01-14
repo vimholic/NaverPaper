@@ -38,7 +38,7 @@ async def process_clien_url(url, tree, session):
             continue
 
         for a_tag in inner_tree.xpath(
-                '//a[starts-with(@href, "https://campaign2-api.naver.com")]/@href'):
+                '//a[starts-with(@href, "https://campaign2-api.naver.com") or starts-with(@href, "https://ofw.adison.co")]/@href'):
             campaign_urls.add(a_tag)
 
 
