@@ -17,7 +17,8 @@ COPY . /app/
 # install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-RUN playwright install --with-deps chromium
+#RUN playwright install --with-deps chromium
+RUN playwright install --with-deps webkit
 
 # Add crontab file in the cron directory
 COPY app.cron /etc/cron.d/app-cron
