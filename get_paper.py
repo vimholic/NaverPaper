@@ -1,11 +1,10 @@
 import os
+import json
+import time
 import asyncio
 from dotenv import load_dotenv
 from telegram import Bot
 import fetch_url
-import requests
-import re
-import random
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
 from playwright.async_api import async_playwright
@@ -13,51 +12,23 @@ from playwright.async_api import async_playwright
 load_dotenv()
 
 
-def get_ua():
-    uastrings = [
-        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.72 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10) AppleWebKit/600.1.25 (KHTML, like Gecko) Version/8.0 Safari/600.1.25",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0",
-        "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/600.1.17 (KHTML, like Gecko) Version/7.1 Safari/537.85.10",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit 537.36 (KHTML, like Gecko) Chrome",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
-        "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36"
-    ]
-    return random.choice(uastrings)
-
-
-async def get_naver_session(nid, npw, tt, tci):
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
-        try:
-            await page.goto("https://nid.naver.com/nidlogin.login")
-            await page.locator("#id").fill(nid)
-            await page.locator("#pw").fill(npw)
-            await page.locator('button[type="submit"].btn_login').click()
-            await page.wait_for_selector('//button[contains(@class, "btn_logout")]')
-            storage = await context.storage_state(path="state.json")
-            cookies = await context.cookies()
-            cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-            session = requests.Session()
-            headers = {"User-Agent": get_ua()}
-            session.headers.update(headers)
-            session.cookies.update(cookies_dict)
-            return session
-        except Exception as e:
-            print(f"Error during login: {e}")
-            await page.screenshot(path=f"login_error_{nid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
-            if tt and tci:
-                await send_telegram_message(tt, tci, f"{nid} - 로그인에 실패했습니다.")
-            return None
-        finally:
-            await context.close()
-            await browser.close()
+async def get_naver_session(context, nid, npw, tt, tci):
+    page = await context.new_page()
+    try:
+        await page.goto("https://nid.naver.com/nidlogin.login")
+        await page.locator("#id").fill(nid)
+        await page.locator("#pw").fill(npw)
+        await page.locator('button[type="submit"].btn_login').click()
+        await page.wait_for_selector('//button[contains(@class, "btn_logout")]')
+        state = await context.storage_state(path="state.json")
+        print(f"{nid} - 네이버 로그인 성공 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return state is not None
+    except Exception as e:
+        print(f"Error during login: {e}")
+        await page.screenshot(path=f"login_error_{nid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        if tt and tci:
+            await send_telegram_message(tt, tci, f"{nid} - 네이버 로그인 실패")
+        return None
 
 
 async def send_telegram_message(token, chat_id, message):
@@ -65,52 +36,176 @@ async def send_telegram_message(token, chat_id, message):
     await bot.sendMessage(chat_id=chat_id, text=message)
 
 
-async def process_campaign_links(session, campaign_links, session_db, nid):
-    pattern = r"alert\('(.*)'\)"
+async def check_cookie_and_login(context, nid, npw, tt, tci):
+    storage_state_path = "state.json"
+    if os.path.exists(storage_state_path):
+        with open(storage_state_path, 'r') as f:
+            storage_state = json.load(f)
+            for cookie in storage_state.get('cookies', []):
+                if cookie['name'] == 'PM_CK_loc':
+                    if cookie['expires'] < time.time():
+                        os.remove(storage_state_path)
+                        print(f"{nid} - 기존 네이버 정보 제거 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                        return await get_naver_session(context, nid, npw, tt, tci)
+                    else:
+                        print(f"{nid} - 이전 네이버 로그인 정보 사용 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                        return True
+    else:
+        return await get_naver_session(context, nid, npw, tt, tci)
+
+
+# async def handle_dialog(dialog):
+#     alert_message = dialog.message
+#     await dialog.dismiss()
+#     return alert_message
+# async def dialog_handler(dialog):
+#     nonlocal result_text
+#     result_text = dialog.message
+    # await dialog.accept()
+    # await dialog.dismiss()
+    # nonlocal dialog_task
+    # dialog_task = asyncio.create_task(dialog.dismiss())
+    # return dialog.message
+
+
+async def process_link(page, link, session_db, nid):
+    result_text = None
+
+    try:
+        await page.goto(link)
+        if result_text:
+            # result_text = await dialog_task
+            print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            if '적립 기간이 아닙니다' in result_text:
+                campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
+                if campaign_url:
+                    campaign_url.is_available = False
+        existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
+        if not existing_visit:
+            session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
+        await asyncio.sleep(5)
+    except Exception as e:
+        print(f"캠페인 URL 처리 에러: {link} - {e}")
+
+
+async def process_campaign_links(page, campaign_links, session_db, nid):
+    result_text = None
+
+    async def dialog_handler(dialog):
+        nonlocal result_text
+        result_text = dialog.message
+        await dialog.dismiss()
+
+    page.on("dialog", dialog_handler)
     for link in campaign_links:
         try:
-            response = session.get(link)
-            lines = response.text.splitlines()
-            for line in lines:
-                match = re.search(pattern, line)
-                if match:
-                    result_text = match.group(1)
-                    print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                    if '적립 기간이 아닙니다' in result_text:
-                        campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
-                        if campaign_url:
-                            campaign_url.is_available = False
+            await page.goto(link)
+            if result_text:
+                # result_text = await dialog_task
+                print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                if '적립 기간이 아닙니다' in result_text:
+                    campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
+                    if campaign_url:
+                        campaign_url.is_available = False
             existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
             if not existing_visit:
                 session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
-            response.raise_for_status()
             await asyncio.sleep(5)
         except Exception as e:
             print(f"캠페인 URL 처리 에러: {link} - {e}")
-            await asyncio.sleep(5)
+
+
+async def send_telegram_message_if_needed(tt, tci, nid, campaign_links):
+    no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
+    if tt and tci:
+        if not campaign_links and no_paper_alarm == "True":
+            await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+        elif campaign_links:
+            await send_telegram_message(
+                tt,
+                tci,
+                f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
+            )
 
 
 async def process_account(nid, npw, session_db, tt=None, tci=None):
     nid = nid.strip()
     npw = npw.strip()
-    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
-        session = await get_naver_session(nid, npw, tt, tci)
-        if session:
-            await process_campaign_links(session, campaign_links, session_db, nid)
-            no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
-            if tt and tci:
-                if not campaign_links and no_paper_alarm == "True":
-                    await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
-                elif campaign_links:
-                    await send_telegram_message(
-                        tt,
-                        tci,
-                        f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
-                    )
-    print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        async with async_playwright() as playwright:
+            iphone_13 = playwright.devices['iPhone 13']
+            browser = await playwright.webkit.launch(headless=True)
+            context = await browser.new_context(**iphone_13)
+            state = await check_cookie_and_login(context, nid, npw, tt, tci)
+            if state:
+                context = await browser.new_context(**iphone_13, storage_state="state.json")
+                page = await context.new_page()
+                await process_campaign_links(page, campaign_links, session_db, nid)
+                # page.on("dialog", dialog_handler)
+                # for link in campaign_links:
+                #     await process_link(page, link, session_db, nid)
+                await send_telegram_message_if_needed(tt, tci, nid, campaign_links)
+    print(f"{nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return campaign_links
+
+
+# async def process_account(nid, npw, session_db, tt=None, tci=None):
+#     nid = nid.strip()
+#     npw = npw.strip()
+#     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
+#     if campaign_links:
+#         storage_state_path = "state.json"
+#         if os.path.exists(storage_state_path):
+#             with open(storage_state_path, 'r') as f:
+#                 storage_state = json.load(f)
+#                 for cookie in storage_state.get('cookies', []):
+#                     if cookie['name'] == 'PM_CK_loc':
+#                         if cookie['expires'] < time.time():
+#                             os.remove(storage_state_path)
+#                             async with async_playwright() as playwright:
+#                                 iphone_13 = playwright.devices['iPhone 13']
+#                                 browser = await playwright.webkit.launch(headless=True)
+#                                 context = await browser.new_context(**iphone_13)
+#                                 state = get_naver_session(context, nid, npw, tt, tci)
+#                                 if state:
+#                                     context = await browser.new_context(**iphone_13, storage_state="state.json")
+#                                     page = await context.new_page()
+#                                     await process_campaign_links(page, campaign_links, session_db, nid)
+#                                     no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
+#                                     if tt and tci:
+#                                         if not campaign_links and no_paper_alarm == "True":
+#                                             await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+#                                         elif campaign_links:
+#                                             await send_telegram_message(
+#                                                 tt,
+#                                                 tci,
+#                                                 f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
+#                                             )
+#                         else:
+#                             async with async_playwright() as playwright:
+#                                 iphone_13 = playwright.devices['iPhone 13']
+#                                 browser = await playwright.webkit.launch(headless=True)
+#                                 context = await browser.new_context(**iphone_13, storage_state="state.json")
+#                                 page = await context.new_page()
+#                                 await process_campaign_links(page, campaign_links, session_db, nid)
+#                                 no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
+#                                 if tt and tci:
+#                                     if not campaign_links and no_paper_alarm == "True":
+#                                         await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
+#                                     elif campaign_links:
+#                                         await send_telegram_message(
+#                                             tt,
+#                                             tci,
+#                                             f"{nid} - 모든 네이버 폐지 줍기를 완료했습니다. 적립 내역 확인 - https://new-m.pay.naver.com/pointshistory/list?depth2Slug=event"
+#                                         )
+#             # state.json 파일에서 쿠키의 만료 여부를 판단하여 만료되었으면 state.json을 삭제하고 로그인을 다시 수행
+#             # 만료되지 않았으면 로그인을 수행하지 않고 쿠키를 로드
+#             # state.json 파일이 없으면 이후 프로세스 중단
+#     print(f"네이버 ID: {nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#     return campaign_links
 
 
 async def process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db):

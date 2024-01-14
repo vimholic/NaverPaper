@@ -76,7 +76,7 @@ def delete_old_urls(session_db):
 async def save_naver_campaign_urls(session_db):
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
-        # ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
+        ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
     ]
     delete_old_urls(session_db)
     async with ClientSession() as session:
