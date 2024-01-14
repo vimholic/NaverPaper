@@ -100,7 +100,7 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
         async with async_playwright() as playwright:
-            iphone_13 = playwright.devices["iPhone 13"]
+            iphone_13 = playwright.devices['iPhone 13']
             browser = await playwright.webkit.launch(headless=True)
             context = await browser.new_context(**iphone_13)
             state = await check_cookie_and_login(context, nid, npw, tt, tci)
