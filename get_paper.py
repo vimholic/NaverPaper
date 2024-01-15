@@ -103,7 +103,8 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
             galaxy_s9 = playwright.devices['Galaxy S9+']
             browser = await playwright.chromium.launch(headless=True)
             context = await browser.new_context(**galaxy_s9)
-            state = await check_cookie_and_login(context, nid, npw, tt, tci)
+            # state = await check_cookie_and_login(context, nid, npw, tt, tci)
+            state = await get_naver_session(context, nid, npw, tt, tci)
             if state:
                 context = await browser.new_context(**galaxy_s9, storage_state="state.json")
                 page = await context.new_page()
