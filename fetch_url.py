@@ -33,19 +33,10 @@ async def process_clien_url(url, tree, session):
         full_link = urljoin(url, link)
         res = await fetch(full_link, session)
         try:
-            # inner_tree = html.fromstring(res)
             inner_soup = BeautifulSoup(res, "html.parser")
-            # print(tostring(inner_tree, method="html", pretty_print=True).decode("utf-8"))
         except Exception as e:
             print(f"{full_link} - {e}")
             continue
-
-        # for a_tag in inner_tree.xpath(
-        #         '//a[starts-with(@href, "https://campaign2-api.naver.com") or starts-with(@href, "https://ofw.adison.co")]/@href'
-        #         # '|//a[starts-with(@href, "https://campaign2-api.naver.com") or starts-with(@href, "https://ofw.adison.co")]/text()'
-        # ):
-        #     a_tag = a_tag.replace(" ", "").strip()
-        #     campaign_urls.add(a_tag)
         for a_tag in inner_soup.find_all("a", href=True):
             if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
                     "https://ofw.adison.co"):
