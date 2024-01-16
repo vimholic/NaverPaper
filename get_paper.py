@@ -91,7 +91,9 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
             if login:
                 await process_campaign_links(page, campaign_links, session_db, nid)
                 await send_telegram_message_if_needed(tt, tci, nid, campaign_links)
-                await context.storage_state(path=storage_state_path)
+                if not os.path.exists('.auth'):
+                    os.makedirs('.auth')
+                    await context.storage_state(path=storage_state_path)
             await context.close()
     print(f"{nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return campaign_links
