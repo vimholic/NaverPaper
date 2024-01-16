@@ -15,4 +15,4 @@ __pycache__/
 naverpaper.drawio
 .$naverpaper.drawio.bkp
 .png
-state.json
+.auth/

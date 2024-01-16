@@ -1,57 +1,38 @@
 import os
-import json
-import time
 import asyncio
 from dotenv import load_dotenv
 from telegram import Bot
 import fetch_url
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, expect
+from pathlib import Path
 
 load_dotenv()
 
 
-async def get_naver_session(context, nid, npw, tt, tci):
-    page = await context.new_page()
+async def naver_login(page, nid, npw, tt, tci):
+    await page.goto("https://new-m.pay.naver.com/pcpay")
+    if not page.url.startswith("https://nid.naver.com/"):
+        return True
     try:
-        await page.goto("https://nid.naver.com/nidlogin.login")
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
         await page.locator('button[type="submit"].btn_login').click()
-        await page.wait_for_selector('//button[contains(@class, "btn_logout")]')
-        state = await context.storage_state(path="state.json")
+        await page.wait_for_selector('a:has-text("로그아웃")', state="visible")
         print(f"{nid} - 네이버 로그인 성공 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        return state is not None
+        return True
     except Exception as e:
         print(f"{nid} - 네이버 로그인 실패 - {e} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         await page.screenshot(path=f"login_error_{nid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
         if tt and tci:
             await send_telegram_message(tt, tci, f"{nid} - 네이버 로그인 실패")
-        return None
+        return False
 
 
 async def send_telegram_message(token, chat_id, message):
     bot = Bot(token=token)
     await bot.sendMessage(chat_id=chat_id, text=message)
-
-
-async def check_cookie_and_login(context, nid, npw, tt, tci):
-    storage_state_path = "state.json"
-    if os.path.exists(storage_state_path):
-        with open(storage_state_path, 'r') as f:
-            storage_state = json.load(f)
-            for cookie in storage_state.get('cookies', []):
-                if cookie['name'] == 'PM_CK_loc':
-                    if cookie['expires'] < time.time():
-                        os.remove(storage_state_path)
-                        print(f"{nid} - 이전 네이버 로그인 정보 제거 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                        return await get_naver_session(context, nid, npw, tt, tci)
-                    else:
-                        print(f"{nid} - 이전 네이버 로그인 정보 사용 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                        return True
-    else:
-        return await get_naver_session(context, nid, npw, tt, tci)
 
 
 async def process_campaign_links(page, campaign_links, session_db, nid):
@@ -100,16 +81,18 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
         async with async_playwright() as playwright:
-            galaxy_s9 = playwright.devices['Galaxy S9+']
+            storage_state_path = Path(".auth").joinpath(f"auth-{nid}.json")
+            storage_state = storage_state_path if storage_state_path.exists() else None
+            device = playwright.devices['Galaxy S9+']
             browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context(**galaxy_s9)
-            # state = await check_cookie_and_login(context, nid, npw, tt, tci)
-            state = await get_naver_session(context, nid, npw, tt, tci)
-            if state:
-                context = await browser.new_context(**galaxy_s9, storage_state="state.json")
-                page = await context.new_page()
+            context = await browser.new_context(storage_state=storage_state, **device)
+            page = await context.new_page()
+            login = await naver_login(page, nid, npw, tt, tci)
+            if login:
                 await process_campaign_links(page, campaign_links, session_db, nid)
                 await send_telegram_message_if_needed(tt, tci, nid, campaign_links)
+                await context.storage_state(path=storage_state_path)
+            await context.close()
     print(f"{nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return campaign_links
 
