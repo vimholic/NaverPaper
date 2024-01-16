@@ -5,7 +5,7 @@ from telegram import Bot
 import fetch_url
 from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
-from playwright.async_api import async_playwright, expect
+from playwright.async_api import async_playwright
 from pathlib import Path
 
 load_dotenv()
