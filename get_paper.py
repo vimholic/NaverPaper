@@ -7,24 +7,28 @@ from datetime import datetime
 from database import UrlVisit, CampaignUrl, get_session
 from playwright.async_api import async_playwright
 from pathlib import Path
+import pytz
 
 load_dotenv()
+seoul_tz = pytz.timezone('Asia/Seoul')
+seoul_dt = datetime.now(seoul_tz)
 
 
 async def naver_login(page, nid, npw, tt, tci):
     await page.goto("https://new-m.pay.naver.com/pcpay")
     if not page.url.startswith("https://nid.naver.com/"):
+        print(f"{nid} - 기존 네이버 로그인 정보 이용 - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
         return True
     try:
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
         await page.locator('button[type="submit"].btn_login').click()
         await page.wait_for_selector('a:has-text("로그아웃")', state="visible")
-        print(f"{nid} - 네이버 로그인 성공 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{nid} - 네이버 로그인 성공 - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
         return True
     except Exception as e:
-        print(f"{nid} - 네이버 로그인 실패 - {e} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        await page.screenshot(path=f"login_error_{nid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        print(f"{nid} - 네이버 로그인 실패 - {e} - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+        await page.screenshot(path=f"login_error_{nid}_{seoul_dt.strftime('%Y%m%d_%H%M%S')}.png")
         if tt and tci:
             await send_telegram_message(tt, tci, f"{nid} - 네이버 로그인 실패")
         return False
@@ -48,14 +52,14 @@ async def process_campaign_links(page, campaign_links, session_db, nid):
         try:
             await page.goto(link)
             if result_text:
-                print(f"캠페인 URL: {link} - {result_text} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"캠페인 URL: {link} - {result_text} - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                 if "적립 기간이 아닙니다" in result_text:
                     campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
                     if campaign_url:
                         campaign_url.is_available = False
             existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
             if not existing_visit:
-                session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
+                session_db.add(UrlVisit(url=link, user_id=nid, visited_at=seoul_dt))
             await asyncio.sleep(5)
         except Exception as e:
             print(f"캠페인 URL 처리 오류: {link} - {e}")
@@ -77,7 +81,7 @@ async def send_telegram_message_if_needed(tt, tci, nid, campaign_links):
 async def process_account(nid, npw, session_db, tt=None, tci=None):
     nid = nid.strip()
     npw = npw.strip()
-    print(f"{nid} - 네이버 폐지 줍기 시작 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{nid} - 네이버 폐지 줍기 시작 - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
     campaign_links = await fetch_url.fetch_naver_campaign_urls(session_db, nid)
     if campaign_links:
         async with async_playwright() as playwright:
@@ -95,8 +99,7 @@ async def process_account(nid, npw, session_db, tt=None, tci=None):
                     os.makedirs('.auth')
                     await context.storage_state(path=storage_state_path)
             await context.close()
-    print(f"{nid} - 네이버 폐지 줍기 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    return campaign_links
+    print(f"{nid} - 네이버 폐지 줍기 완료 - {seoul_dt.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 async def process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db):
@@ -118,9 +121,9 @@ async def main():
     telegram_chat_id_txt = os.environ.get("TELEGRAM_CHAT_ID")
     session_db = get_session()
     try:
-        print("캠페인 URL 수집 시작 - " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print("캠페인 URL 수집 시작 - " + seoul_dt.strftime('%Y-%m-%d %H:%M:%S'))
         await fetch_url.save_naver_campaign_urls(session_db)
-        print("캠페인 URL 수집 완료 - " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print("캠페인 URL 수집 완료 - " + seoul_dt.strftime('%Y-%m-%d %H:%M:%S'))
         if telegram_token_txt and telegram_chat_id_txt:
             telegram_tokens = telegram_token_txt.split('|')
             telegram_chat_ids = telegram_chat_id_txt.split('|')
