@@ -2,6 +2,7 @@ FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
+USER root
 RUN apt-get update
 RUN apt-get install -y python3 python3-pip cron vim tzdata
 
@@ -30,4 +31,4 @@ RUN chmod 0644 /etc/cron.d/app-cron
 RUN crontab /etc/cron.d/app-cron
 
 # Run the command on container startup
-CMD python3 /app/get_paper.py && cron -f
+#CMD python3 /app/get_paper.py && cron -f
