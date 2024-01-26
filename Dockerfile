@@ -31,4 +31,4 @@ RUN chmod 0644 /etc/cron.d/app-cron
 RUN crontab /etc/cron.d/app-cron
 
 # Run the command on container startup
-#CMD python3 /app/get_paper.py && cron -f
+CMD python3 /app/get_paper.py
