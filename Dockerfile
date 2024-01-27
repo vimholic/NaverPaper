@@ -5,6 +5,7 @@ ENV TZ=Asia/Seoul
 USER root
 RUN apt-get update
 RUN apt-get install -y python3 python3-pip cron vim tzdata
+RUN apt-get clean
 
 # set work directory
 WORKDIR /app
