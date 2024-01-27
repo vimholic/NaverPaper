@@ -15,20 +15,15 @@ ENV PYTHONUNBUFFERED 1
 
 COPY . /app/
 
-# install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 RUN playwright install --with-deps chromium
 #RUN playwright install --with-deps webkit
 
-# Add crontab file in the cron directory
 COPY app.cron /etc/cron.d/app-cron
 
-# Give execution rights on the cron job
 RUN chmod 0644 /etc/cron.d/app-cron
-
-# Apply cron job
+RUN chmod +x /app/get_paper.py
 RUN crontab /etc/cron.d/app-cron
 
-# Run the command on container startup
-CMD python3 /app/get_paper.py
+CMD python3 /app/get_paper.py && cron -f

@@ -16,7 +16,6 @@ httpcore==1.0.2
 httpx==0.25.2
 idna==3.6
 iniconfig==2.0.0
-lxml==4.9.4
 multidict==6.0.4
 naverpaper==0.1
 packaging==23.2

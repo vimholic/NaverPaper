@@ -1,6 +1,4 @@
 from aiohttp import ClientSession
-from lxml import html
-from lxml.etree import tostring
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 import asyncio
@@ -17,17 +15,17 @@ async def fetch(url, session):
 
 async def process_url(url, session, process_func):
     response = await fetch(url, session)
-    tree = html.fromstring(response)
-    await process_func(url, tree, session)
+    soup = BeautifulSoup(response, "html.parser")
+    await process_func(url, soup, session)
 
 
-async def process_clien_url(url, tree, session):
-    list_subject_links = tree.xpath('//span[@class="list_subject"]')
+async def process_clien_url(url, soup, session):
+    list_subject_links = soup.select('span.list_subject')
     naver_links = []
     for span in list_subject_links:
-        a_tag = span.xpath('.//a[contains(text(), "네이버")]/@href')
+        a_tag = span.select_one('a:-soup-contains("네이버")')
         if a_tag:
-            naver_links.extend(a_tag)
+            naver_links.append(a_tag['href'])
 
     for link in naver_links:
         full_link = urljoin(url, link)
@@ -43,25 +41,25 @@ async def process_clien_url(url, tree, session):
                 campaign_urls.add(a_tag["href"])
 
 
-async def process_ppomppu_url(url, tree, session):
-    naver_links = tree.xpath(
-        '//*[@id="revolution_main_table"]//td[@class="list_vspace" and @align="left"]//a[contains(., "네이버")]/@href')
+async def process_ppomppu_url(url, soup, session):
     base_url = "https://www.ppomppu.co.kr/zboard/zboard.php?"
+    naver_links = [a['href'] for a in soup.select('#revolution_main_table td.list_vspace[align="left"] a') if
+                   "네이버" in a.text]
+
     for link in naver_links:
         full_link = urljoin(base_url, link)
         res = await fetch(full_link, session)
         try:
-            inner_tree = html.fromstring(res)
-            # print(tostring(inner_tree, method="html", pretty_print=True).decode("utf-8"))
+            inner_soup = BeautifulSoup(res, "html.parser")
         except Exception as e:
             print(f"{full_link} - {e}")
             continue
-        for a_tag in inner_tree.xpath(
-                '//a[starts-with(@href, "https://campaign2-api.naver.com")]/@href'
-                '|//a[starts-with(@href, "https://s.ppomppu.co.kr?idno=coupon") and (starts-with(text(), "https://campaign2-api.naver.com") or starts-with(text(), "https://ofw.adison.co"))]/text()'
-        ):
-            a_tag = a_tag.replace(" ", "").strip()
-            campaign_urls.add(a_tag)
+        for a_tag in inner_soup.select(
+                'a[href^="https://campaign2-api.naver.com"], a[href^="https://s.ppomppu.co.kr?idno=coupon"]'):
+            a_tag_text = a_tag.get_text(strip=True).replace(" ", "")
+            if a_tag_text.startswith("https://campaign2-api.naver.com") or a_tag_text.startswith(
+                    "https://ofw.adison.co"):
+                campaign_urls.add(a_tag_text)
 
 
 def delete_old_urls(session_db):
@@ -82,7 +80,10 @@ async def save_naver_campaign_urls(session_db):
     delete_old_urls(session_db)
     async with ClientSession() as session:
         for url, process_func in urls:
-            await process_url(url, session, process_func)
+            try:
+                await process_url(url, session, process_func)
+            except Exception as e:
+                print(f"{url} - {e}")
     for link in campaign_urls:
         existing_url = session_db.query(CampaignUrl).filter_by(url=link).first()
         if not existing_url:
