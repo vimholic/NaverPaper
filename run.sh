@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sleep $[ ( $RANDOM % 61 )  + 180 ]m
+sleep $(( ( RANDOM % 180 )  + 1 ))
 cd /app && python3 get_paper.py

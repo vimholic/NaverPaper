@@ -23,7 +23,7 @@ RUN playwright install --with-deps chromium
 COPY app.cron /etc/cron.d/app-cron
 
 RUN chmod 0644 /etc/cron.d/app-cron
-RUN chmod +x /app/get_paper.py
+RUN chmod +x /app/run.sh
 RUN crontab /etc/cron.d/app-cron
 
 CMD python3 /app/get_paper.py && cron -f
