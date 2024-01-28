@@ -4,13 +4,15 @@ from dotenv import load_dotenv
 from telegram import Bot
 import fetch_url
 from datetime import datetime, timedelta
-from database import UrlVisit, CampaignUrl, User, get_session
+from database import Database
+from models import UrlVisit, CampaignUrl, User
 from playwright.async_api import async_playwright
 import pytz
 import re
 
 load_dotenv()
 seoul_tz = pytz.timezone('Asia/Seoul')
+db = Database()
 
 
 async def naver_login(page, nid, npw, tt, tci):
@@ -123,8 +125,7 @@ async def main():
     naver_pws = os.environ.get("NAVER_PW").split('|')
     telegram_token_txt = os.environ.get("TELEGRAM_TOKEN")
     telegram_chat_id_txt = os.environ.get("TELEGRAM_CHAT_ID")
-    session_db = get_session()
-    try:
+    with db.get_session() as session_db:
         print("캠페인 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
         await fetch_url.save_naver_campaign_urls(session_db)
         print("캠페인 URL 수집 완료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
@@ -138,8 +139,6 @@ async def main():
         seven_days_ago = datetime.now() - timedelta(days=7)
         session_db.query(User).filter(User.updated_at < seven_days_ago).delete()
         session_db.commit()
-    finally:
-        session_db.close()
 
 
 if __name__ == '__main__':

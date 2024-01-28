@@ -2,7 +2,7 @@ from aiohttp import ClientSession
 from urllib.parse import urljoin
 from datetime import datetime, timedelta
 import asyncio
-from database import UrlVisit, CampaignUrl, get_session
+from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
 
 campaign_urls = set()
@@ -102,9 +102,9 @@ async def fetch_naver_campaign_urls(session_db, nid):
 
 
 if __name__ == '__main__':
-    session_db = get_session()
-    try:
+    from database import Database
+
+    db = Database()
+    with db.get_session() as session_db:
         asyncio.run(save_naver_campaign_urls(session_db))
         session_db.commit()
-    finally:
-        session_db.close()

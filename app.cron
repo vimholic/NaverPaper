@@ -1,1 +1,1 @@
-* * * * * /app/run.sh
+0 */6 * * * python3 /app/get_paper.py > /proc/1/fd/1 2>/proc/1/fd/2
