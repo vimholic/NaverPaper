@@ -120,6 +120,21 @@ async def process_without_telegram(naver_ids, naver_pws, session_db):
         await process_account(nid, npw, session_db)
 
 
+def delete_old_stuff(session_db):
+    current_date = datetime.now()
+    sixty_days_ago = current_date - timedelta(days=60)
+    try:
+        old_urls = session_db.query(CampaignUrl).filter(CampaignUrl.date_added < sixty_days_ago)
+        for old_url in old_urls:
+            old_visits = session_db.query(UrlVisit).filter_by(url=old_url.url)
+            old_visits.delete()
+        old_urls.delete()
+        seven_days_ago = current_date - timedelta(days=7)
+        session_db.query(User).filter(User.updated_at < seven_days_ago).delete()
+    except Exception as e:
+        print(f"오래된 데이터 삭제 중 오류 발생 - {e}")
+
+
 async def main():
     naver_ids = os.environ.get("NAVER_ID").split('|')
     naver_pws = os.environ.get("NAVER_PW").split('|')
@@ -135,9 +150,7 @@ async def main():
             await process_with_telegram(naver_ids, naver_pws, telegram_tokens, telegram_chat_ids, session_db)
         elif not telegram_token_txt or not telegram_chat_id_txt:
             await process_without_telegram(naver_ids, naver_pws, session_db)
-        # Delete old users
-        seven_days_ago = datetime.now() - timedelta(days=7)
-        session_db.query(User).filter(User.updated_at < seven_days_ago).delete()
+        delete_old_stuff(session_db)
         session_db.commit()
 
 

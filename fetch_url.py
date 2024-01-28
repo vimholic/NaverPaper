@@ -1,6 +1,5 @@
 from aiohttp import ClientSession
 from urllib.parse import urljoin
-from datetime import datetime, timedelta
 import asyncio
 from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
@@ -62,22 +61,11 @@ async def process_ppomppu_url(url, soup, session):
                 campaign_urls.add(a_tag_text)
 
 
-def delete_old_urls(session_db):
-    current_date = datetime.now()
-    n_days_ago = current_date - timedelta(days=60)
-    old_urls = session_db.query(CampaignUrl).filter(CampaignUrl.date_added < n_days_ago)
-    for old_url in old_urls:
-        old_visits = session_db.query(UrlVisit).filter_by(url=old_url.url)
-        old_visits.delete()
-    old_urls.delete()
-
-
 async def save_naver_campaign_urls(session_db):
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
         ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
     ]
-    delete_old_urls(session_db)
     async with ClientSession() as session:
         for url, process_func in urls:
             try:
