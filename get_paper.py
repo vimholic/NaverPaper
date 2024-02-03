@@ -63,12 +63,12 @@ async def process_campaign_links(page, campaign_links, session_db, nid):
                     campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
                     if campaign_url:
                         campaign_url.is_available = False
-            existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
-            if not existing_visit:
-                session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
-            await asyncio.sleep(5)
         except Exception as e:
             print(f"캠페인 URL 처리 오류: {link} - {e}")
+        existing_visit = session_db.query(UrlVisit).filter_by(url=link, user_id=nid).first()
+        if not existing_visit:
+            session_db.add(UrlVisit(url=link, user_id=nid, visited_at=datetime.now()))
+        await asyncio.sleep(5)
     return points
 
 
