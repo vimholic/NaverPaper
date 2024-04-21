@@ -1,1 +1,1 @@
-1 */3 * * * /app/run.sh
+50 * * * * /app/run.sh

@@ -61,10 +61,34 @@ async def process_ppomppu_url(url, soup, session):
                 campaign_urls.add(a_tag_text)
 
 
+async def process_damoang_url(url, soup, session):
+    section = soup.find("section", id='bo_list')
+    items = section.find_all('li', class_='list-group-item', attrs={'onclick': True})
+    naver_links = []
+    for item in items:
+        onclick_attr = item.get('onclick')
+        if onclick_attr and '네이버' in item.text:
+            link = onclick_attr.split('location.href=')[1].split(';')[0].replace("'", "").replace(":null", "")
+            naver_links.append(link)
+
+    for link in naver_links:
+        res = await fetch(link, session)
+        try:
+            inner_soup = BeautifulSoup(res, "html.parser")
+        except Exception as e:
+            print(f"{link} - {e}")
+            continue
+        for a_tag in inner_soup.find_all("a", href=True):
+            if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
+                    "https://ofw.adison.co"):
+                campaign_urls.add(a_tag["href"])
+
+
 async def save_naver_campaign_urls(session_db):
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
-        ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url)
+        ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url),
+        ("https://damoang.net/economy", process_damoang_url)
     ]
     async with ClientSession() as session:
         for url, process_func in urls:
