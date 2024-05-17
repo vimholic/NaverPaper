@@ -23,7 +23,7 @@ async def naver_login(page, nid, npw, tt, tci):
     try:
         await page.locator("#id").fill(nid)
         await page.locator("#pw").fill(npw)
-        await page.locator('button[type="submit"].btn_login').click()
+        await page.locator("#pw").press("Enter")
         await page.wait_for_selector('a:has-text("로그아웃")', state="visible")
         print(f"{nid} - 네이버 로그인 성공 - {datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S')}")
         return True
