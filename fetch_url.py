@@ -8,7 +8,9 @@ campaign_urls = set()
 
 
 async def fetch(url, session):
-    async with session.get(url) as response:
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36'}
+    async with session.get(url, headers=headers) as response:
         return await response.text(errors="ignore")
 
 
@@ -63,12 +65,13 @@ async def process_ppomppu_url(url, soup, session):
 
 async def process_damoang_url(url, soup, session):
     section = soup.find("section", id='bo_list')
-    items = section.find_all('li', class_='list-group-item', attrs={'onclick': True})
+    items = section.find_all('a', class_='da-link-block subject-ellipsis',
+                             attrs={"href": True})
     naver_links = []
     for item in items:
-        onclick_attr = item.get('onclick')
+        onclick_attr = item.get('href')
         if onclick_attr and '네이버' in item.text:
-            link = onclick_attr.split('location.href=')[1].split(';')[0].replace("'", "").replace(":null", "")
+            link = onclick_attr
             naver_links.append(link)
 
     for link in naver_links:
