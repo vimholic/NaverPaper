@@ -143,7 +143,7 @@ async def main():
     with db.get_session() as session_db:
         print("캠페인 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
         await fetch_url.save_naver_campaign_urls(session_db)
-        print("캠페인 URL 수집 완료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+        print("캠페인 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
         if telegram_token_txt and telegram_chat_id_txt:
             telegram_tokens = telegram_token_txt.split('|')
             telegram_chat_ids = telegram_chat_id_txt.split('|')

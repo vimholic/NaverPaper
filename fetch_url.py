@@ -3,8 +3,11 @@ from urllib.parse import urljoin
 import asyncio
 from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
+import pytz
+from datetime import datetime
 
 campaign_urls = set()
+seoul_tz = pytz.timezone('Asia/Seoul')
 
 
 async def fetch(url, session):
@@ -21,12 +24,14 @@ async def process_url(url, session, process_func):
 
 
 async def process_clien_url(url, soup, session):
-    list_subject_links = soup.select('span.list_subject')
+    print("클리앙 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    initial_count = len(campaign_urls)
+    list_subject_links = soup.select('[class="list_item symph-row"]')
     naver_links = []
     for span in list_subject_links:
-        a_tag = span.select_one('a:-soup-contains("네이버")')
+        a_tag = span.select_one(':-soup-contains("네이버")')
         if a_tag:
-            naver_links.append(a_tag['href'])
+            naver_links.append(span['href'])
 
     for link in naver_links:
         full_link = urljoin(url, link)
@@ -40,9 +45,14 @@ async def process_clien_url(url, soup, session):
             if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
                     "https://ofw.adison.co"):
                 campaign_urls.add(a_tag["href"])
+    added_count = len(campaign_urls) - initial_count
+    print(f"클리앙에서 수집된 URL 수: {added_count}")
+    print("클리앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
 
 
 async def process_ppomppu_url(url, soup, session):
+    print("뽐뿌 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    initial_count = len(campaign_urls)
     base_url = "https://www.ppomppu.co.kr/zboard/zboard.php?"
     naver_links = [a['href'] for a in soup.select('#revolution_main_table td.list_vspace[align="left"] a') if
                    "네이버" in a.text]
@@ -61,12 +71,16 @@ async def process_ppomppu_url(url, soup, session):
             if a_tag_text.startswith("https://campaign2-api.naver.com") or a_tag_text.startswith(
                     "https://ofw.adison.co"):
                 campaign_urls.add(a_tag_text)
+    added_count = len(campaign_urls) - initial_count
+    print(f"뽐뿌에서 수집된 URL 수: {added_count}")
+    print("뽐뿌 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
 
 
 async def process_damoang_url(url, soup, session):
+    print("다모앙 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    initial_count = len(campaign_urls)
     section = soup.find("section", id='bo_list')
-    items = section.find_all('a', class_='da-link-block subject-ellipsis',
-                             attrs={"href": True})
+    items = section.find_all('a', class_='da-link-block da-article-link subject-ellipsis', attrs={"href": True})
     naver_links = []
     for item in items:
         onclick_attr = item.get('href')
@@ -85,6 +99,9 @@ async def process_damoang_url(url, soup, session):
             if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
                     "https://ofw.adison.co"):
                 campaign_urls.add(a_tag["href"])
+    added_count = len(campaign_urls) - initial_count
+    print(f"다모앙에서 수집된 URL 수: {added_count}")
+    print("다모앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
 
 
 async def save_naver_campaign_urls(session_db):
