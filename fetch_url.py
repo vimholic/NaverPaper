@@ -1,18 +1,33 @@
+import asyncio
+import pytz
+import random
 from aiohttp import ClientSession
 from urllib.parse import urljoin
-import asyncio
 from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
-import pytz
 from datetime import datetime
 
 campaign_urls = set()
 seoul_tz = pytz.timezone('Asia/Seoul')
 
 
+def get_ua():
+    uastrings = [
+        "Mozilla/5.0 (Linux; Android 12; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.61 Mobile Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 11; Redmi Note 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 10; M2006C3LG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.97 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/19.0 Chrome/102.0.5005.125 Mobile Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/103.0.5060.63 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 11; Lenovo TB-J606F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.88 Safari/537.36",
+    ]
+    return random.choice(uastrings)
+
+
 async def fetch(url, session):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36'}
+    headers = {'User-Agent': get_ua()}
     async with session.get(url, headers=headers) as response:
         return await response.text(errors="ignore")
 
@@ -42,9 +57,10 @@ async def process_clien_url(url, soup, session):
             print(f"{full_link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", href=True):
-            if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
+            if a_tag["href"].startswith("https://campaign2.naver.com") or a_tag["href"].startswith(
                     "https://ofw.adison.co"):
-                campaign_urls.add(a_tag["href"])
+                if len(a_tag["href"]) > 40:
+                    campaign_urls.add(a_tag["href"])
     added_count = len(campaign_urls) - initial_count
     print(f"클리앙에서 수집된 URL 수: {added_count}")
     print("클리앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
@@ -53,9 +69,11 @@ async def process_clien_url(url, soup, session):
 async def process_ppomppu_url(url, soup, session):
     print("뽐뿌 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
     initial_count = len(campaign_urls)
-    base_url = "https://www.ppomppu.co.kr/zboard/zboard.php?"
-    naver_links = [a['href'] for a in soup.select('#revolution_main_table td.list_vspace[align="left"] a') if
-                   "네이버" in a.text]
+    base_url = "https://m.ppomppu.co.kr"
+    naver_links = []
+    for a_tag in soup.find_all('a', href=True):
+        if '네이버페이' in a_tag.text:
+            naver_links.append(a_tag['href'])
 
     for link in naver_links:
         full_link = urljoin(base_url, link)
@@ -65,12 +83,10 @@ async def process_ppomppu_url(url, soup, session):
         except Exception as e:
             print(f"{full_link} - {e}")
             continue
-        for a_tag in inner_soup.select(
-                'a[href^="https://campaign2-api.naver.com"], a[href^="https://s.ppomppu.co.kr?idno=coupon"]'):
-            a_tag_text = a_tag.get_text(strip=True).replace(" ", "")
-            if a_tag_text.startswith("https://campaign2-api.naver.com") or a_tag_text.startswith(
-                    "https://ofw.adison.co"):
-                campaign_urls.add(a_tag_text)
+        for a_tag in inner_soup.find_all("a", class_="noeffect", href=True):
+            if a_tag["href"].startswith("https://s.ppomppu.co.kr?idno=coupon"):
+                if len(a_tag["href"]) > 40:
+                    campaign_urls.add(a_tag["href"])
     added_count = len(campaign_urls) - initial_count
     print(f"뽐뿌에서 수집된 URL 수: {added_count}")
     print("뽐뿌 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
@@ -96,9 +112,10 @@ async def process_damoang_url(url, soup, session):
             print(f"{link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", href=True):
-            if a_tag["href"].startswith("https://campaign2-api.naver.com") or a_tag["href"].startswith(
+            if a_tag["href"].startswith("https://campaign2.naver.com") or a_tag["href"].startswith(
                     "https://ofw.adison.co"):
-                campaign_urls.add(a_tag["href"])
+                if len(a_tag["href"]) > 40:
+                    campaign_urls.add(a_tag["href"])
     added_count = len(campaign_urls) - initial_count
     print(f"다모앙에서 수집된 URL 수: {added_count}")
     print("다모앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
@@ -107,7 +124,7 @@ async def process_damoang_url(url, soup, session):
 async def save_naver_campaign_urls(session_db):
     urls = [
         ("https://www.clien.net/service/board/jirum", process_clien_url),
-        ("https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon", process_ppomppu_url),
+        ("https://m.ppomppu.co.kr/new/bbs_list.php?id=coupon&extref=1", process_ppomppu_url),
         ("https://damoang.net/economy", process_damoang_url)
     ]
     async with ClientSession() as session:
