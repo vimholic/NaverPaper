@@ -16,9 +16,8 @@ ENV PYTHONUNBUFFERED 1
 COPY . /app/
 
 RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-RUN playwright install --with-deps chromium
-#RUN playwright install --with-deps webkit
+RUN pip install --no-cache-dir -r requirements.txt && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN python3 -m playwright install --with-deps chromium
 
 COPY app.cron /etc/cron.d/app-cron
 

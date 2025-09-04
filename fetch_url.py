@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
 from datetime import datetime
+from playwright.async_api import async_playwright
 
 campaign_urls = set()
 seoul_tz = pytz.timezone('Asia/Seoul')
@@ -32,9 +33,55 @@ async def fetch(url, session):
         return await response.text(errors="ignore")
 
 
+def _looks_like_cloudflare(html: str) -> bool:
+    if not html:
+        return True
+    lowered = html.lower()
+    return (
+        'just a moment' in lowered
+        or 'cf_chl_' in lowered
+        or 'challenge-platform' in lowered
+        or 'cloudflare' in lowered
+    )
+
+
+async def fetch_with_playwright(url: str) -> str:
+    # Headless 브라우저로 Cloudflare/JS 의존 페이지를 폴백 수집
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        context = await browser.new_context(user_agent=get_ua(), locale='ko-KR')
+        page = await context.new_page()
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # 네트워크가 잠잠해질 때까지 대기 (최대 10초)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
+            content = await page.content()
+            return content
+        finally:
+            await context.close()
+            await browser.close()
+
+
+async def get_soup(url: str, session: ClientSession) -> BeautifulSoup:
+    html = await fetch(url, session)
+    if _looks_like_cloudflare(html):
+        # CF로 보이면 Playwright 폴백
+        try:
+            html = await fetch_with_playwright(url)
+        except Exception as e:
+            print(f"{url} - Playwright 폴백 실패 - {e}")
+    try:
+        return BeautifulSoup(html or "", "html.parser")
+    except Exception as e:
+        print(f"{url} - HTML 파싱 실패 - {e}")
+        return BeautifulSoup("", "html.parser")
+
+
 async def process_url(url, session, process_func):
-    response = await fetch(url, session)
-    soup = BeautifulSoup(response, "html.parser")
+    soup = await get_soup(url, session)
     await process_func(url, soup, session)
 
 
@@ -95,27 +142,57 @@ async def process_ppomppu_url(url, soup, session):
 async def process_damoang_url(url, soup, session):
     print("다모앙 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
     initial_count = len(campaign_urls)
-    section = soup.find("section", id='bo_list')
-    items = section.find_all('a', class_='da-link-block da-article-link subject-ellipsis', attrs={"href": True})
-    naver_links = []
-    for item in items:
-        onclick_attr = item.get('href')
-        if onclick_attr and '네이버' in item.text:
-            link = onclick_attr
-            naver_links.append(link)
+    # 목록 페이지에서 '네이버'가 포함된 게시글 링크를 보다 일반적으로 추출
+    try:
+        anchors = soup.find_all('a', href=True)
+    except Exception:
+        anchors = []
 
-    for link in naver_links:
-        res = await fetch(link, session)
+    naver_links = []
+    for a in anchors:
         try:
-            inner_soup = BeautifulSoup(res, "html.parser")
+            text = (a.get_text() or "").strip()
+            href = a.get('href')
+        except Exception:
+            continue
+        if not href or not text:
+            continue
+        if '네이버' in text:
+            # 절대 URL 보정
+            full_link = urljoin(url, href)
+            if full_link not in naver_links:
+                naver_links.append(full_link)
+
+    if not naver_links:
+        # 기존 선택자 실패 또는 CF 가능성 → Playwright 폴백으로 목록 재시도
+        try:
+            html = await fetch_with_playwright(url)
+            soup_pf = BeautifulSoup(html or "", "html.parser")
+            anchors = soup_pf.find_all('a', href=True)
+            for a in anchors:
+                text = (a.get_text() or "").strip()
+                href = a.get('href')
+                if href and text and '네이버' in text:
+                    full_link = urljoin(url, href)
+                    if full_link not in naver_links:
+                        naver_links.append(full_link)
+        except Exception as e:
+            print(f"{url} - 목록 폴백 실패 - {e}")
+
+    # 상세 페이지에서 네이버 캠페인 링크 추출
+    for link in naver_links:
+        try:
+            inner_soup = await get_soup(link, session)
         except Exception as e:
             print(f"{link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", href=True):
-            if a_tag["href"].startswith("https://campaign2.naver.com") or a_tag["href"].startswith(
-                    "https://ofw.adison.co"):
-                if len(a_tag["href"]) > 40:
-                    campaign_urls.add(a_tag["href"])
+            href = a_tag.get("href")
+            if not href:
+                continue
+            if href.startswith("https://campaign2.naver.com") or href.startswith("https://ofw.adison.co"):
+                if len(href) > 40:
+                    campaign_urls.add(href)
     added_count = len(campaign_urls) - initial_count
     print(f"다모앙에서 수집된 URL 수: {added_count}")
     print("다모앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
