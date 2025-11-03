@@ -8,6 +8,7 @@ from datetime import datetime
 from playwright.async_api import async_playwright
 from utils.logger import setup_logger, get_log_filename
 from utils.common import get_random_ua
+from config import Config
 
 campaign_urls = set()
 seoul_tz = pytz.timezone('Asia/Seoul')
@@ -41,10 +42,10 @@ async def fetch_with_playwright(url: str) -> str:
         context = await browser.new_context(user_agent=get_random_ua(), locale='ko-KR')
         page = await context.new_page()
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            # 네트워크가 잠잠해질 때까지 대기 (최대 10초)
+            await page.goto(url, wait_until="domcontentloaded", timeout=Config.PLAYWRIGHT_PAGE_TIMEOUT)
+            # 네트워크가 잠잠해질 때까지 대기
             try:
-                await page.wait_for_load_state("networkidle", timeout=10000)
+                await page.wait_for_load_state("networkidle", timeout=Config.PLAYWRIGHT_NETWORK_TIMEOUT)
             except Exception:
                 pass
             content = await page.content()

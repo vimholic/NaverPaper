@@ -3,7 +3,6 @@ import asyncio
 import pytz
 import fetch_url
 import re
-from dotenv import load_dotenv
 from telegram import Bot
 from datetime import datetime, timedelta
 from database import Database
@@ -12,8 +11,8 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from utils.logger import setup_logger, get_log_filename
 from utils.common import get_random_ua
+from config import Config
 
-load_dotenv()
 seoul_tz = pytz.timezone('Asia/Seoul')
 db = Database()
 
@@ -61,7 +60,7 @@ async def process_campaign2_link(page, link, session_db):
         if match:
             point = int(match.group(1))
             await page.locator('a.popup_link >> text=포인트 받기').click()  # 버튼 클릭
-            await asyncio.sleep(3)  # 3초 대기
+            await asyncio.sleep(Config.PAGE_WAIT_SHORT)
             logger.info(f"캠페인 URL: {link} - {point} 포인트 획득!")
     else:
         block_div_text = ' '.join(block_div.text.split())
@@ -70,7 +69,7 @@ async def process_campaign2_link(page, link, session_db):
             campaign_url = session_db.query(CampaignUrl).filter_by(url=link).first()
             if campaign_url:
                 campaign_url.is_available = False
-    await asyncio.sleep(3)
+    await asyncio.sleep(Config.PAGE_WAIT_SHORT)
     return point if match else 0
 
 async def process_campaign_links(page, campaign_links, session_db, nid):
@@ -88,7 +87,7 @@ async def process_campaign_links(page, campaign_links, session_db, nid):
                     points += await process_campaign2_link(page, redirected_url, session_db)
             else:
                 await page.goto(link, wait_until="networkidle")
-                await asyncio.sleep(5)
+                await asyncio.sleep(Config.PAGE_WAIT_LONG)
                 logger.info(f"캠페인 URL: {link} - 방문 완료")
         except Exception as e:
             logger.error(f"캠페인 URL 처리 오류: {link} - {e}")
@@ -102,9 +101,8 @@ async def process_campaign_links(page, campaign_links, session_db, nid):
 
 
 async def send_telegram_message_if_needed(tt, tci, nid, campaign_links, points):
-    no_paper_alarm = os.environ.get("NO_PAPER_ALARM")
     if tt and tci:
-        if (not campaign_links or points == 0) and no_paper_alarm == "True":
+        if (not campaign_links or points == 0) and Config.NO_PAPER_ALARM:
             await send_telegram_message(tt, tci, f"{nid} - 더 이상 주울 네이버 폐지가 없습니다.")
         elif campaign_links and points > 0:
             await send_telegram_message(
@@ -154,24 +152,36 @@ async def process_without_telegram(naver_ids, naver_pws, session_db):
 
 def delete_old_stuff(session_db):
     current_date = datetime.now()
-    sixty_days_ago = current_date - timedelta(days=60)
+    campaign_cutoff = current_date - timedelta(days=Config.CAMPAIGN_RETENTION_DAYS)
     try:
-        old_urls = session_db.query(CampaignUrl).filter(CampaignUrl.date_added < sixty_days_ago)
+        old_urls = session_db.query(CampaignUrl).filter(CampaignUrl.date_added < campaign_cutoff)
         for old_url in old_urls:
             old_visits = session_db.query(UrlVisit).filter_by(url=old_url.url)
             old_visits.delete()
         old_urls.delete()
-        seven_days_ago = current_date - timedelta(days=7)
-        session_db.query(User).filter(User.updated_at < seven_days_ago).delete()
+        logger.info(f"캠페인 URL 정리 완료 ({Config.CAMPAIGN_RETENTION_DAYS}일 이전)")
+
+        session_cutoff = current_date - timedelta(days=Config.USER_SESSION_RETENTION_DAYS)
+        deleted_count = session_db.query(User).filter(User.updated_at < session_cutoff).delete()
+        logger.info(f"사용자 세션 정리 완료: {deleted_count}개 ({Config.USER_SESSION_RETENTION_DAYS}일 이전)")
     except Exception as e:
         logger.error(f"오래된 데이터 삭제 중 오류 발생 - {e}")
 
 
 async def main():
-    naver_ids = os.environ.get("NAVER_ID").split('|')
-    naver_pws = os.environ.get("NAVER_PW").split('|')
-    telegram_token_txt = os.environ.get("TELEGRAM_TOKEN")
-    telegram_chat_id_txt = os.environ.get("TELEGRAM_CHAT_ID")
+    # 설정 검증
+    try:
+        Config.validate()
+        logger.info("설정 검증 완료")
+    except ValueError as e:
+        logger.error(f"설정 오류: {e}")
+        return
+
+    naver_ids = Config.NAVER_IDS
+    naver_pws = Config.NAVER_PWS
+    telegram_token_txt = Config.TELEGRAM_TOKEN
+    telegram_chat_id_txt = Config.TELEGRAM_CHAT_ID
+
     with db.get_session() as session_db:
         logger.info("캠페인 URL 수집 시작")
         await fetch_url.save_naver_campaign_urls(session_db)
