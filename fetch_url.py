@@ -1,34 +1,23 @@
 import asyncio
 import pytz
-import random
 from aiohttp import ClientSession
 from urllib.parse import urljoin
 from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
 from datetime import datetime
 from playwright.async_api import async_playwright
+from utils.logger import setup_logger, get_log_filename
+from utils.common import get_random_ua
 
 campaign_urls = set()
 seoul_tz = pytz.timezone('Asia/Seoul')
 
-
-def get_ua():
-    uastrings = [
-        "Mozilla/5.0 (Linux; Android 12; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.61 Mobile Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Linux; Android 11; Redmi Note 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36",
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Linux; Android 10; M2006C3LG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.97 Mobile Safari/537.36",
-        "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/19.0 Chrome/102.0.5005.125 Mobile Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/103.0.5060.63 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Linux; Android 11; Lenovo TB-J606F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.88 Safari/537.36",
-    ]
-    return random.choice(uastrings)
+# 로거 설정
+logger = setup_logger(__name__, get_log_filename('fetch_url'))
 
 
 async def fetch(url, session):
-    headers = {'User-Agent': get_ua()}
+    headers = {'User-Agent': get_random_ua()}
     async with session.get(url, headers=headers) as response:
         return await response.text(errors="ignore")
 
@@ -49,7 +38,7 @@ async def fetch_with_playwright(url: str) -> str:
     # Headless 브라우저로 Cloudflare/JS 의존 페이지를 폴백 수집
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
-        context = await browser.new_context(user_agent=get_ua(), locale='ko-KR')
+        context = await browser.new_context(user_agent=get_random_ua(), locale='ko-KR')
         page = await context.new_page()
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -72,11 +61,11 @@ async def get_soup(url: str, session: ClientSession) -> BeautifulSoup:
         try:
             html = await fetch_with_playwright(url)
         except Exception as e:
-            print(f"{url} - Playwright 폴백 실패 - {e}")
+            logger.error(f"{url} - Playwright 폴백 실패 - {e}")
     try:
         return BeautifulSoup(html or "", "html.parser")
     except Exception as e:
-        print(f"{url} - HTML 파싱 실패 - {e}")
+        logger.error(f"{url} - HTML 파싱 실패 - {e}")
         return BeautifulSoup("", "html.parser")
 
 
@@ -86,7 +75,7 @@ async def process_url(url, session, process_func):
 
 
 async def process_clien_url(url, soup, session):
-    print("클리앙 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info("클리앙 URL 수집 시작")
     initial_count = len(campaign_urls)
     list_subject_links = soup.select('[class="list_item symph-row"]')
     naver_links = []
@@ -101,7 +90,7 @@ async def process_clien_url(url, soup, session):
         try:
             inner_soup = BeautifulSoup(res, "html.parser")
         except Exception as e:
-            print(f"{full_link} - {e}")
+            logger.error(f"{full_link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", href=True):
             if a_tag["href"].startswith("https://campaign2.naver.com") or a_tag["href"].startswith(
@@ -109,12 +98,12 @@ async def process_clien_url(url, soup, session):
                 if len(a_tag["href"]) > 40:
                     campaign_urls.add(a_tag["href"])
     added_count = len(campaign_urls) - initial_count
-    print(f"클리앙에서 수집된 URL 수: {added_count}")
-    print("클리앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(f"클리앙에서 수집된 URL 수: {added_count}")
+    logger.info("클리앙 URL 수집 종료")
 
 
 async def process_ppomppu_url(url, soup, session):
-    print("뽐뿌 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info("뽐뿌 URL 수집 시작")
     initial_count = len(campaign_urls)
     base_url = "https://m.ppomppu.co.kr"
     naver_links = []
@@ -128,19 +117,19 @@ async def process_ppomppu_url(url, soup, session):
         try:
             inner_soup = BeautifulSoup(res, "html.parser")
         except Exception as e:
-            print(f"{full_link} - {e}")
+            logger.error(f"{full_link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", class_="noeffect", href=True):
             if a_tag["href"].startswith("https://s.ppomppu.co.kr?idno=coupon"):
                 if len(a_tag["href"]) > 40:
                     campaign_urls.add(a_tag["href"])
     added_count = len(campaign_urls) - initial_count
-    print(f"뽐뿌에서 수집된 URL 수: {added_count}")
-    print("뽐뿌 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(f"뽐뿌에서 수집된 URL 수: {added_count}")
+    logger.info("뽐뿌 URL 수집 종료")
 
 
 async def process_damoang_url(url, soup, session):
-    print("다모앙 URL 수집 시작 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info("다모앙 URL 수집 시작")
     initial_count = len(campaign_urls)
     # 목록 페이지에서 '네이버'가 포함된 게시글 링크를 보다 일반적으로 추출
     try:
@@ -177,14 +166,14 @@ async def process_damoang_url(url, soup, session):
                     if full_link not in naver_links:
                         naver_links.append(full_link)
         except Exception as e:
-            print(f"{url} - 목록 폴백 실패 - {e}")
+            logger.error(f"{url} - 목록 폴백 실패 - {e}")
 
     # 상세 페이지에서 네이버 캠페인 링크 추출
     for link in naver_links:
         try:
             inner_soup = await get_soup(link, session)
         except Exception as e:
-            print(f"{link} - {e}")
+            logger.error(f"{link} - {e}")
             continue
         for a_tag in inner_soup.find_all("a", href=True):
             href = a_tag.get("href")
@@ -194,8 +183,8 @@ async def process_damoang_url(url, soup, session):
                 if len(href) > 40:
                     campaign_urls.add(href)
     added_count = len(campaign_urls) - initial_count
-    print(f"다모앙에서 수집된 URL 수: {added_count}")
-    print("다모앙 URL 수집 종료 - " + datetime.now(seoul_tz).strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info(f"다모앙에서 수집된 URL 수: {added_count}")
+    logger.info("다모앙 URL 수집 종료")
 
 
 async def save_naver_campaign_urls(session_db):
@@ -209,7 +198,7 @@ async def save_naver_campaign_urls(session_db):
             try:
                 await process_url(url, session, process_func)
             except Exception as e:
-                print(f"{url} - {e}")
+                logger.error(f"{url} - {e}")
     for link in campaign_urls:
         existing_url = session_db.query(CampaignUrl).filter_by(url=link).first()
         if not existing_url:
