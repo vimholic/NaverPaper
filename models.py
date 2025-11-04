@@ -1,6 +1,13 @@
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, PrimaryKeyConstraint, JSON
-from sqlalchemy.orm import relationship
+# Standard library imports
 from datetime import datetime
+
+# Third-party imports
+from sqlalchemy import (
+    Column, String, DateTime, Boolean, ForeignKey, PrimaryKeyConstraint, JSON
+)
+from sqlalchemy.orm import relationship
+
+# Local imports
 from database import Database
 
 db = Database()

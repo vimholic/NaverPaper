@@ -1,5 +1,10 @@
+# Standard library imports
 import asyncio
+
+# Third-party imports
 from playwright.async_api import async_playwright
+
+# Local imports
 from config import Config
 
 

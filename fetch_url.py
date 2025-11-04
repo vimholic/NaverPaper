@@ -1,14 +1,19 @@
+# Standard library imports
 import asyncio
+from datetime import datetime
+from urllib.parse import urljoin
+
+# Third-party imports
 import pytz
 from aiohttp import ClientSession
-from urllib.parse import urljoin
-from models import UrlVisit, CampaignUrl
 from bs4 import BeautifulSoup
-from datetime import datetime
 from playwright.async_api import async_playwright
-from utils.logger import setup_logger, get_log_filename
-from utils.common import get_random_ua
+
+# Local imports
 from config import Config
+from models import UrlVisit, CampaignUrl
+from utils.common import get_random_ua
+from utils.logger import setup_logger, get_log_filename
 
 campaign_urls = set()
 seoul_tz = pytz.timezone('Asia/Seoul')

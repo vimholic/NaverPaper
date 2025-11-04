@@ -1,17 +1,21 @@
-import os
+# Standard library imports
 import asyncio
-import pytz
-import fetch_url
 import re
-from telegram import Bot
 from datetime import datetime, timedelta
+
+# Third-party imports
+import pytz
+from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
+from telegram import Bot
+
+# Local imports
+import fetch_url
+from config import Config
 from database import Database
 from models import UrlVisit, CampaignUrl, User
-from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
-from utils.logger import setup_logger, get_log_filename
 from utils.common import get_random_ua
-from config import Config
+from utils.logger import setup_logger, get_log_filename
 
 seoul_tz = pytz.timezone('Asia/Seoul')
 db = Database()

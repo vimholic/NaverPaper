@@ -1,6 +1,9 @@
+# Standard library imports
+from contextlib import contextmanager
+
+# Third-party imports
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from contextlib import contextmanager
 
 
 class Database:
