@@ -19,3 +19,11 @@ naverpaper.drawio
 .auth/
 *.html
 logs/
+
+# Test and coverage
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
