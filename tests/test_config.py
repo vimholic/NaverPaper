@@ -70,5 +70,4 @@ class TestConfig:
         assert "CAMPAIGN_RETENTION_DAYS" in captured.out
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+# Run with: pytest tests/test_config.py -v

@@ -89,5 +89,4 @@ class TestCommon:
             assert 'AppleWebKit' in ua or 'Gecko' in ua
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+# Run with: pytest tests/test_utils.py -v

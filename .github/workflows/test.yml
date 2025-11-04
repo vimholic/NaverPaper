@@ -91,8 +91,9 @@ jobs:
       env:
         NAVER_ID: test_id
         NAVER_PW: test_pw
+        PYTHONPATH: .
       run: |
-        python tests/test_config.py
+        pytest tests/test_config.py -v
 
   lint:
     runs-on: ubuntu-22.04
