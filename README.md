@@ -29,6 +29,39 @@ https://github.com/stateofai/naver-paper
 
 <br><br>
 
+# 최근 개선사항
+
+## 🔧 개발 환경 및 코드 품질
+* **GitHub Actions CI/CD 파이프라인 구축**: Python 3.8~3.11 버전에서 자동 테스트 및 코드 검증
+  * 자동 린트 검사 (flake8)
+  * 코드 포맷팅 검사 (black, isort)
+  * 코드 커버리지 측정 및 Codecov 연동
+* **테스트 인프라 구축**: pytest 기반 유닛 테스트 및 비동기 테스트 지원
+  * `pytest.ini` 설정 파일 추가
+  * `requirements-dev.txt`로 개발 의존성 분리
+* **코드 품질 개선**:
+  * flake8 린트 오류 수정
+  * import 순서 정리 (isort)
+  * PEP 8 코딩 스타일 준수
+
+## ⚙️ 기능 개선
+* **환경 변수 기반 설정 관리**: `config.py`를 통한 체계적인 설정 관리
+* **로깅 시스템 개선**: 통합 로깅 시스템으로 코드 중복 제거 및 로그 추적 개선
+* **Cloudflare 우회 기능**: Playwright를 사용한 Cloudflare 우회 기능 추가
+* **쿠키 저장 기능**: `save_cookies.py`를 통해 로컬에서 쿠키 생성 후 서버에서 사용 가능
+  * 서버에서 캡챠로 인한 로그인 실패 시 로컬 PC에서 쿠키 생성 후 활용 가능
+
+## 🐳 Docker 개선
+* **Ubuntu 22.04 기반 이미지**: Playwright 의존성 설치 문제 해결
+* **Dockerfile 최적화**: 이미지 빌드 속도 및 안정성 개선
+
+## 🐛 버그 수정
+* pytest 사용 및 PYTHONPATH 설정으로 모듈 import 문제 해결
+* requirements.txt 정리 및 불필요한 의존성 제거
+* 뽐뿌, 클리앙, 다모앙 URL 수집 현행화
+
+<br><br>
+
 # 사용법
 
 > Oracle Cloud의 E2 Micro, A1 서버, 시놀로지에서 정상 동작 확인했습니다.
